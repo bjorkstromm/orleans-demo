@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Reentrancy", "src\Reentranc
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Transactions", "src\Transactions\Transactions.csproj", "{DA0F2FFE-3200-4436-BA7D-018E7414CA5F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Booking", "src\Booking\Booking.csproj", "{0567E9AA-E74C-4635-BFD2-2BBB0D8B8F60}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -26,9 +28,14 @@ Global
 		{DA0F2FFE-3200-4436-BA7D-018E7414CA5F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DA0F2FFE-3200-4436-BA7D-018E7414CA5F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DA0F2FFE-3200-4436-BA7D-018E7414CA5F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0567E9AA-E74C-4635-BFD2-2BBB0D8B8F60}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0567E9AA-E74C-4635-BFD2-2BBB0D8B8F60}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0567E9AA-E74C-4635-BFD2-2BBB0D8B8F60}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0567E9AA-E74C-4635-BFD2-2BBB0D8B8F60}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{74533347-0CF0-4FAD-B7FC-576E70357F40} = {F4E95B7C-6854-4BCD-84FA-4D30A3A38F6F}
 		{DA0F2FFE-3200-4436-BA7D-018E7414CA5F} = {F4E95B7C-6854-4BCD-84FA-4D30A3A38F6F}
+		{0567E9AA-E74C-4635-BFD2-2BBB0D8B8F60} = {F4E95B7C-6854-4BCD-84FA-4D30A3A38F6F}
 	EndGlobalSection
 EndGlobal
