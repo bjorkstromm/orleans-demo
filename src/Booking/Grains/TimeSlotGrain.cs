@@ -7,6 +7,7 @@ public class TimeSlotGrain : Grain, ITimeSlotGrain, IRemindable
 {
     private readonly IPersistentState<State> _state;
     private readonly IGrainFactory _grainFactory;
+    private IReservationObserver? _observer;
 
     private const string ClearReservationReminder = nameof(ClearReservationReminder);
 
@@ -27,7 +28,7 @@ public class TimeSlotGrain : Grain, ITimeSlotGrain, IRemindable
         _grainFactory = grainFactory;
     }
 
-    public async Task<Reservation> Reserve()
+    public async Task<Reservation> Reserve(IReservationObserver observer)
     {
         if (!TimeSlot.TryParse(this.GetPrimaryKeyString(), out var timeSlot))
         {
@@ -40,7 +41,7 @@ public class TimeSlotGrain : Grain, ITimeSlotGrain, IRemindable
         }
 
         var id = Guid.NewGuid().ToString("N");
-        var expiresOn = DateTimeOffset.UtcNow.AddSeconds(30);
+        var expiresOn = DateTimeOffset.UtcNow.AddSeconds(20);
 
         _state.State = new State { ReservationId = id };
 
@@ -54,7 +55,9 @@ public class TimeSlotGrain : Grain, ITimeSlotGrain, IRemindable
             expiresOn - DateTimeOffset.UtcNow,
             TimeSpan.FromMinutes(5));
 
-        return new Reservation(id, expiresOn);
+        _observer = observer;
+
+        return new Reservation(this.GetPrimaryKeyString(), id, expiresOn);
     }
 
     public async Task<bool> CancelReservation(string reservationId)
@@ -74,6 +77,8 @@ public class TimeSlotGrain : Grain, ITimeSlotGrain, IRemindable
         var room = _grainFactory.GetGrain<IRoomGrain>(timeSlot.RoomId);
         await room.SetAvailability(timeSlot, isAvailable: false);
 
+        _observer = null;
+
         return true;
     }
 
@@ -87,6 +92,8 @@ public class TimeSlotGrain : Grain, ITimeSlotGrain, IRemindable
         var reminder = await this.GetReminder(ClearReservationReminder);
 
         await this.UnregisterReminder(reminder);
+
+        _observer = null;
 
         return true;
     }
@@ -107,6 +114,12 @@ public class TimeSlotGrain : Grain, ITimeSlotGrain, IRemindable
 
             var reminder = await this.GetReminder(reminderName);
             await this.UnregisterReminder(reminder);
+
+            if (_observer is not null)
+            {
+                await _observer.OnReservationExpired();
+                _observer = null;
+            }
         }
     }
 }

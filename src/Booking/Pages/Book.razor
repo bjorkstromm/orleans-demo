@@ -1,9 +1,11 @@
 @page "/book"
 @implements IDisposable
+@implements IReservationObserver
 @using Booking.Models
 @using Booking.Grains
 @using System.ComponentModel.DataAnnotations
 @inject IGrainFactory GrainFactory
+@inject IJSRuntime JsRuntime
 
 <PageTitle>Book</PageTitle>
 
@@ -17,7 +19,7 @@
 }
 else
 {
-    <EditForm Model="@_inputModel" OnValidSubmit="@Submit">
+    <EditForm Model="@_inputModel" OnValidSubmit="@FetchTimeSlots">
         <DataAnnotationsValidator />
 
         <select @bind="_inputModel.RoomId">
@@ -64,11 +66,11 @@ else
     {
         if (_reservation.Success)
         {
-            var expiresIn = (int)(_reservation.ExpiresOn!.Value - DateTimeOffset.UtcNow).TotalSeconds;
+            var expiresIn = Math.Max(0, (int)(_reservation.ExpiresOn!.Value - DateTimeOffset.UtcNow).TotalSeconds);
 
             <p>Reservation expires in @(expiresIn) seconds.</p>
-            <button type="submit">Cancel</button>
-            <button type="submit">Book</button>
+            <button type="submit" onclick="@CancelReservation">Cancel</button>
+            <button type="submit" onclick="@CompleteBooking">Book</button>
         }
         else
         {
@@ -90,18 +92,20 @@ else
     private IReadOnlyCollection<Room>? _rooms;
     private IReadOnlyCollection<TimeSlot> _timeSlots = Array.Empty<TimeSlot>();
 
-    private InputModel _inputModel = new();
-    private Reservation? _reservation = null;
-    private Timer? _timer = null;
+    private readonly InputModel _inputModel = new();
+    private Reservation? _reservation;
+    private Timer? _timer;
 
     protected override async Task OnInitializedAsync()
     {
         var catalog = GrainFactory.GetGrain<IRoomCatalogGrain>(0);
         _rooms = await catalog.GetRooms();
         _inputModel.RoomId = _rooms.FirstOrDefault()?.Id;
+
+        await FetchTimeSlots();
     }
 
-    private async Task Submit()
+    private async Task FetchTimeSlots()
     {
         var room = GrainFactory.GetGrain<IRoomGrain>(_inputModel.RoomId);
 
@@ -110,16 +114,66 @@ else
 
     private async Task Reserve(string timeSlotId)
     {
-        var room = GrainFactory.GetGrain<ITimeSlotGrain>(timeSlotId);
-        _reservation = await room.Reserve();
+        var timeSlot = GrainFactory.GetGrain<ITimeSlotGrain>(timeSlotId);
+        var observer = GrainFactory.CreateObjectReference<IReservationObserver>(this);
+        _reservation = await timeSlot.Reserve(observer);
 
         _timer = new Timer(Tick, null, 0, 1000);
     }
 
+    private async Task CancelReservation()
+    {
+        if (_reservation is null)
+        {
+            return;
+        }
+
+        var timeSlot = GrainFactory.GetGrain<ITimeSlotGrain>(_reservation.TimeSlotId);
+        var success = await timeSlot.CancelReservation(_reservation.ReservationId!);
+
+        await JsRuntime.InvokeVoidAsync("alert", success
+            ? "Reservation cancelled successfully"
+            : "Unable to cancel reservation");
+
+        _reservation = null;
+
+        Clear();
+    }
+
+    private async Task CompleteBooking()
+    {
+        if (_reservation is null)
+        {
+            return;
+        }
+
+        var timeSlot = GrainFactory.GetGrain<ITimeSlotGrain>(_reservation.TimeSlotId);
+        var success = await timeSlot.Book(_reservation.ReservationId!);
+
+        await JsRuntime.InvokeVoidAsync("alert", success
+            ? "Booking completed successfully"
+            : "Unable to complete booking");
+
+        Clear();
+    }
+
     private void Tick(object? _) => InvokeAsync(StateHasChanged);
 
-    public void Dispose()
+    public void Dispose() => Clear();
+
+    private void Clear()
     {
+        _reservation = null;
         _timer?.Dispose();
+        _timer = null;
     }
+
+    public async Task OnReservationExpired()
+    {
+        await JsRuntime.InvokeVoidAsync("alert", "Reservation expired");
+
+        Clear();
+        await InvokeAsync(StateHasChanged);
+    }
+
 }
