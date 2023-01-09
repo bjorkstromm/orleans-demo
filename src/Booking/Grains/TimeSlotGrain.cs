@@ -49,7 +49,7 @@ public class TimeSlotGrain : Grain, ITimeSlotGrain, IRemindable
 
         var room = _grainFactory.GetGrain<IRoomGrain>(timeSlot.RoomId);
 
-        await room.SetAvailability(timeSlot, isAvailable: false);
+        await room.SetAvailability(timeSlot with { Available = false });
 
         await this.RegisterOrUpdateReminder(ClearReservationReminder,
             expiresOn - DateTimeOffset.UtcNow,
@@ -75,7 +75,7 @@ public class TimeSlotGrain : Grain, ITimeSlotGrain, IRemindable
         await _state.ClearStateAsync();
 
         var room = _grainFactory.GetGrain<IRoomGrain>(timeSlot.RoomId);
-        await room.SetAvailability(timeSlot, isAvailable: false);
+        await room.SetAvailability(timeSlot with { Available = true });
 
         _observer = null;
 
@@ -110,7 +110,7 @@ public class TimeSlotGrain : Grain, ITimeSlotGrain, IRemindable
             await _state.ClearStateAsync();
 
             var room = _grainFactory.GetGrain<IRoomGrain>(timeSlot.RoomId);
-            await room.SetAvailability(timeSlot, isAvailable: true);
+            await room.SetAvailability(timeSlot with { Available = true });
 
             var reminder = await this.GetReminder(reminderName);
             await this.UnregisterReminder(reminder);

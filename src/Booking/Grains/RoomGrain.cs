@@ -1,11 +1,13 @@
 using Booking.Models;
 using Orleans.Runtime;
+using Orleans.Utilities;
 
 namespace Booking.Grains;
 
 public class RoomGrain : Grain, IRoomGrain
 {
     private readonly IPersistentState<State> _state;
+    private readonly ObserverManager<IRoomObserver> _observers;
 
     [GenerateSerializer]
     public record State
@@ -15,9 +17,11 @@ public class RoomGrain : Grain, IRoomGrain
     }
 
     public RoomGrain(
-        [PersistentState("room")] IPersistentState<State> state)
+        [PersistentState("room")] IPersistentState<State> state,
+        ILogger<RoomGrain> logger)
     {
         _state = state;
+        _observers = new ObserverManager<IRoomObserver>(TimeSpan.FromMinutes(5), logger);
     }
 
     public Task<IReadOnlyCollection<TimeSlot>> GetTimeSlots(DateOnly date)
@@ -36,14 +40,26 @@ public class RoomGrain : Grain, IRoomGrain
         return Task.FromResult<IReadOnlyCollection<TimeSlot>>(slots);
     }
 
-    public async Task SetAvailability(TimeSlot timeSlot, bool isAvailable)
+    public Task Subscribe(IRoomObserver observer)
+    {
+        _observers.Subscribe(observer, observer);
+        return Task.CompletedTask;
+    }
+
+    public Task Unsubscribe(IRoomObserver observer)
+    {
+        _observers.Unsubscribe(observer);
+        return Task.CompletedTask;
+    }
+
+    public async Task SetAvailability(TimeSlot timeSlot)
     {
         if (timeSlot.RoomId != this.GetPrimaryKeyString())
         {
             return;
         }
 
-        if (isAvailable)
+        if (timeSlot.Available)
         {
             _state.State.NotAvailable.Remove(timeSlot.Id);
         }
@@ -53,5 +69,7 @@ public class RoomGrain : Grain, IRoomGrain
         }
 
         await _state.WriteStateAsync();
+        await _observers.Notify(x =>
+            x.OnAvailabilityChanged(timeSlot));
     }
 }

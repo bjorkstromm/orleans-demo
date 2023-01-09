@@ -1,6 +1,7 @@
 @page "/book"
-@implements IDisposable
+@implements IAsyncDisposable
 @implements IReservationObserver
+@implements IRoomObserver
 @using Booking.Models
 @using Booking.Grains
 @using System.ComponentModel.DataAnnotations
@@ -95,6 +96,7 @@ else
     private readonly InputModel _inputModel = new();
     private Reservation? _reservation;
     private Timer? _timer;
+    private string? _observedRoomId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -110,14 +112,38 @@ else
         var room = GrainFactory.GetGrain<IRoomGrain>(_inputModel.RoomId);
 
         _timeSlots = await room.GetTimeSlots(DateOnly.FromDateTime(_inputModel.Date));
+
+        // Observe changes to the room.
+        var observer = GrainFactory.CreateObjectReference<IRoomObserver>(this);
+        await room.Subscribe(observer);
+
+        // Unsubscribe from the previous room.
+        if (_observedRoomId is not null
+            && _observedRoomId != _inputModel.RoomId)
+        {
+            room = GrainFactory.GetGrain<IRoomGrain>(_observedRoomId);
+            await room.Unsubscribe(observer);
+        }
+
+        // Remember the observed room.
+        _observedRoomId = _inputModel.RoomId;
     }
 
     private async Task Reserve(string timeSlotId)
     {
+        await ClearSelected();
+
         var timeSlot = GrainFactory.GetGrain<ITimeSlotGrain>(timeSlotId);
         var observer = GrainFactory.CreateObjectReference<IReservationObserver>(this);
-        _reservation = await timeSlot.Reserve(observer);
+        var reservation = await timeSlot.Reserve(observer);
 
+        if (!reservation.Success)
+        {
+            await JsRuntime.InvokeVoidAsync("alert", "Reservation failed");
+            return;
+        }
+
+        _reservation = reservation;
         _timer = new Timer(Tick, null, 0, 1000);
     }
 
@@ -136,8 +162,7 @@ else
             : "Unable to cancel reservation");
 
         _reservation = null;
-
-        Clear();
+        await ClearSelected();
     }
 
     private async Task CompleteBooking()
@@ -154,26 +179,64 @@ else
             ? "Booking completed successfully"
             : "Unable to complete booking");
 
-        Clear();
+        _reservation = null;
+        await ClearSelected();
     }
 
     private void Tick(object? _) => InvokeAsync(StateHasChanged);
 
-    public void Dispose() => Clear();
-
-    private void Clear()
+    private async Task ClearSelected()
     {
-        _reservation = null;
-        _timer?.Dispose();
-        _timer = null;
+        if (_timer is not null)
+        {
+            await _timer.DisposeAsync();
+            _timer = null;
+        }
+
+        if (_reservation is not null)
+        {
+            var timeSlot = GrainFactory.GetGrain<ITimeSlotGrain>(_reservation.TimeSlotId);
+            await timeSlot.CancelReservation(_reservation.ReservationId!);
+            _reservation = null;
+        }
     }
 
     public async Task OnReservationExpired()
     {
         await JsRuntime.InvokeVoidAsync("alert", "Reservation expired");
 
-        Clear();
+        _reservation = null;
+        await ClearSelected();
         await InvokeAsync(StateHasChanged);
     }
 
+    public async Task OnAvailabilityChanged(TimeSlot timeSlot)
+    {
+        if (timeSlot.Date != DateOnly.FromDateTime(_inputModel.Date))
+        {
+            return;
+        }
+
+        _timeSlots = _timeSlots
+            .Select(x => x.Id == timeSlot.Id ? timeSlot : x)
+            .ToArray();
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_timer is not null)
+        {
+            await _timer.DisposeAsync();
+        }
+
+        // Stop observing room.
+        if (_observedRoomId is not null)
+        {
+            var room = GrainFactory.GetGrain<IRoomGrain>(_observedRoomId);
+            var observer = GrainFactory.CreateObjectReference<IRoomObserver>(this);
+            await room.Unsubscribe(observer);
+        }
+    }
 }

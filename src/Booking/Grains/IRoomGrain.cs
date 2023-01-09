@@ -8,5 +8,9 @@ public interface IRoomGrain : IGrainWithStringKey
     [ReadOnly]
     Task<IReadOnlyCollection<TimeSlot>> GetTimeSlots(DateOnly date);
 
-    Task SetAvailability(TimeSlot timeSlot, bool isAvailable);
+    Task Subscribe(IRoomObserver observer);
+
+    Task Unsubscribe(IRoomObserver observer);
+
+    Task SetAvailability(TimeSlot timeSlot);
 }
