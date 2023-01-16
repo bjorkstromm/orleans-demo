@@ -1,0 +1,70 @@
+@page "/rooms"
+@using Microsoft.AspNetCore.Components
+@using System.ComponentModel.DataAnnotations
+@inject IClusterClient ClusterClient
+
+<PageTitle>Rooms</PageTitle>
+
+<h1>Rooms</h1>
+
+@if (_rooms == null)
+{
+    <p>
+        <em>Loading...</em>
+    </p>
+}
+else
+{
+    <EditForm Model="@_inputModel" OnValidSubmit="@AddRoom">
+        <DataAnnotationsValidator />
+
+        <InputText id="name" @bind-Value="_inputModel.Name" />
+
+        <button type="submit">Submit</button>
+    </EditForm>
+
+    <hr/>
+
+    <table class="table">
+        <thead>
+        <tr>
+            <th>Id</th>
+            <th>Name</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var room in _rooms)
+        {
+            <tr>
+                <td>@room.Id</td>
+                <td>@room.Name</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+@code {
+
+    public class InputModel
+    {
+        [Required]
+        public string? Name { get; set; }
+    }
+    private IReadOnlyCollection<Room>? _rooms;
+    private InputModel _inputModel = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var catalog = ClusterClient.GetGrain<IRoomCatalogGrain>(0);
+        _rooms = await catalog.GetRooms();
+    }
+
+    private async Task AddRoom()
+    {
+        var catalog = ClusterClient.GetGrain<IRoomCatalogGrain>(0);
+        await catalog.AddRoom(_inputModel.Name!);
+        _inputModel = new InputModel();
+        _rooms = await catalog.GetRooms();
+    }
+}
