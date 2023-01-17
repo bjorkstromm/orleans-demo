@@ -33,4 +33,5 @@ docker logout "$acrName.azurecr.io"
 # Deploy
 az deployment group create `
     --resource-group $resourceGroup `
-    --template-file infra/app.bicep
+    --template-file infra/app.bicep `
+    --parameters "version=$version"

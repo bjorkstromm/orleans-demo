@@ -66,6 +66,10 @@ resource siloContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
           ]
         }
       ]
+      scale: {
+        minReplicas: 1
+        maxReplicas: 1
+      }
     }
   }
 }
@@ -117,6 +121,10 @@ resource dashboardContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
           ]
         }
       ]
+      scale: {
+        minReplicas: 1
+        maxReplicas: 1
+      }
     }
   }
 }
@@ -168,6 +176,10 @@ resource webContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
           ]
         }
       ]
+      scale: {
+        minReplicas: 1
+        maxReplicas: 1
+      }
     }
   }
 }
