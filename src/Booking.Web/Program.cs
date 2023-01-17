@@ -18,6 +18,7 @@ builder.Host.UseOrleansClient(clientBuilder =>
 });
 
 // Add services to the container.
+builder.Services.AddApplicationInsightsTelemetry();
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 

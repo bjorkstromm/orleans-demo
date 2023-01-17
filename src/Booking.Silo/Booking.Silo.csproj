@@ -17,6 +17,7 @@
         <PackageReference Include="Microsoft.Orleans.Persistence.AzureStorage" Version="7.0.0" />
         <PackageReference Include="Microsoft.Orleans.Reminders.AzureStorage" Version="7.0.0" />
         <PackageReference Include="Microsoft.Orleans.Serialization.NewtonsoftJson" Version="7.0.0" />
+        <PackageReference Include="Microsoft.ApplicationInsights.WorkerService" Version="2.13.1" />
     </ItemGroup>
 
     <ItemGroup>

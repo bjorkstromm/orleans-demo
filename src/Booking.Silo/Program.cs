@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
 using Orleans.Serialization;
@@ -13,6 +14,8 @@ await Host.CreateDefaultBuilder(args)
         {
             builder.ConfigureEndpoints(IPAddress.Loopback, siloPort: 11_111, gatewayPort: 30_000);
         }
+
+        builder.Services.AddApplicationInsightsTelemetryWorkerService();
 
         builder.Configure<SiloOptions>(options =>
         {
