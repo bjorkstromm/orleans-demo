@@ -251,4 +251,30 @@ resource adminContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
       }
     }
   }
+  resource authConfig 'authConfigs' = {
+    name: 'current'
+    properties: {
+      platform: {
+        enabled: true
+      }
+      globalValidation: {
+        unauthenticatedClientAction: 'RedirectToLoginPage'
+        redirectToProvider: 'azureactivedirectory'
+      }
+      identityProviders: {
+        azureActiveDirectory: {
+          registration: {
+            openIdIssuer: 'https://sts.windows.net/${subscription().tenantId}/v2.0'
+            clientId: aadClientId
+          }
+          validation: {
+            allowedAudiences: []
+          }
+        }
+      }
+      login: {
+        preserveUrlFragmentsForLogins: false
+      }
+    }
+  }
 }
