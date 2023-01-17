@@ -1,14 +1,17 @@
 ﻿using System.Net;
+using Azure.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
-using Orleans.Serialization;
 
 await Host.CreateDefaultBuilder(args)
     .UseOrleans((context, builder) =>
     {
+        var storageName = context.Configuration.GetValue<string>("AZURE_STORAGE_NAME");
+        var managedIdentityClientId = context.Configuration.GetValue<string>("MANAGEDIDENTITY_CLIENTID");
         var connectionString = context.Configuration.GetValue<string>("AzureWebJobsStorage");
+        var useManagedIdentity = !string.IsNullOrWhiteSpace(storageName) && !string.IsNullOrWhiteSpace(managedIdentityClientId);
 
         if (context.HostingEnvironment.IsDevelopment())
         {
@@ -22,16 +25,52 @@ await Host.CreateDefaultBuilder(args)
             options.SiloName = "Booking.Silo";
         });
         builder.UseAzureStorageClustering(
-            options => options.ConfigureTableServiceClient(connectionString));
+            options =>
+            {
+                if (useManagedIdentity)
+                {
+                    var uri = new Uri($"https://{storageName}.table.core.windows.net/");
+                    options.ConfigureTableServiceClient(uri, new DefaultAzureCredential(new DefaultAzureCredentialOptions
+                    {
+                        ManagedIdentityClientId = managedIdentityClientId
+                    }));
+                }
+                else
+                {
+                    options.ConfigureTableServiceClient(connectionString);
+                }
+            });
         builder.AddAzureBlobGrainStorageAsDefault(
-            options => options.ConfigureBlobServiceClient(connectionString));
-        builder.UseAzureTableReminderService(options =>
-            options.ConfigureTableServiceClient(connectionString));
-
-        builder.Services.AddSerializer(serializerBuilder =>
-        {
-            serializerBuilder.AddNewtonsoftJsonSerializer(
-                isSupported: type => type.Namespace?.StartsWith("Newtonsoft.Json") ?? false);
-        });
+            options =>
+            {
+                if (useManagedIdentity)
+                {
+                    var uri = new Uri($"https://{storageName}.blob.core.windows.net/");
+                    options.ConfigureBlobServiceClient(uri, new DefaultAzureCredential(new DefaultAzureCredentialOptions
+                    {
+                        ManagedIdentityClientId = managedIdentityClientId
+                    }));
+                }
+                else
+                {
+                    options.ConfigureBlobServiceClient(connectionString);
+                }
+            });
+        builder.UseAzureTableReminderService(
+            options =>
+            {
+                if (useManagedIdentity)
+                {
+                    var uri = new Uri($"https://{storageName}.table.core.windows.net/");
+                    options.ConfigureTableServiceClient(uri, new DefaultAzureCredential(new DefaultAzureCredentialOptions
+                    {
+                        ManagedIdentityClientId = managedIdentityClientId
+                    }));
+                }
+                else
+                {
+                    options.ConfigureTableServiceClient(connectionString);
+                }
+            });
     })
     .RunConsoleAsync();

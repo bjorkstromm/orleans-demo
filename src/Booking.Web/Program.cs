@@ -1,20 +1,30 @@
-using Orleans.Configuration;
-using Orleans.Serialization;
+using Azure.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Host.UseOrleansClient(clientBuilder =>
 {
+    var storageName = builder.Configuration.GetValue<string>("AZURE_STORAGE_NAME");
+    var managedIdentityClientId = builder.Configuration.GetValue<string>("MANAGEDIDENTITY_CLIENTID");
     var connectionString = builder.Configuration.GetValue<string>("AzureWebJobsStorage");
+    var useManagedIdentity = !string.IsNullOrWhiteSpace(storageName) && !string.IsNullOrWhiteSpace(managedIdentityClientId);
 
     clientBuilder.UseAzureStorageClustering(
-        options => options.ConfigureTableServiceClient(connectionString));
-
-    clientBuilder.Services.AddSerializer(serializerBuilder =>
-    {
-        serializerBuilder.AddNewtonsoftJsonSerializer(
-            isSupported: type => type.Namespace?.StartsWith("Newtonsoft.Json") ?? false);
-    });
+        options =>
+        {
+            if (useManagedIdentity)
+            {
+                var uri = new Uri($"https://{storageName}.table.core.windows.net/");
+                options.ConfigureTableServiceClient(uri, new DefaultAzureCredential(new DefaultAzureCredentialOptions
+                {
+                    ManagedIdentityClientId = managedIdentityClientId
+                }));
+            }
+            else
+            {
+                options.ConfigureTableServiceClient(connectionString);
+            }
+        });
 });
 
 // Add services to the container.
