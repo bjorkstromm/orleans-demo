@@ -1,4 +1,5 @@
 using Azure.Identity;
+using Blazored.Toast;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -29,6 +30,7 @@ builder.Host.UseOrleansClient(clientBuilder =>
 
 // Add services to the container.
 builder.Services.AddApplicationInsightsTelemetry();
+builder.Services.AddBlazoredToast();
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 

@@ -3,8 +3,9 @@
 @implements IReservationObserver
 @implements IRoomObserver
 @using System.ComponentModel.DataAnnotations
+@using Blazored.Toast.Services
 @inject IClusterClient ClusterClient
-@inject IJSRuntime JsRuntime
+@inject IToastService ToastService
 
 <PageTitle>Book</PageTitle>
 
@@ -21,21 +22,30 @@ else
     <EditForm Model="@_inputModel" OnValidSubmit="@FetchTimeSlots">
         <DataAnnotationsValidator />
 
-        <select @bind="_inputModel.RoomId">
-            @foreach(var room in _rooms)
-            {
-                <option value="@room.Id">@room.Name</option>
-            }
-        </select>
+        <div class="row">
+            <div class="col">
+                <select class="form-select"
+                        @bind="_inputModel.RoomId">
+                    @foreach (var room in _rooms)
+                    {
+                        <option value="@room.Id">@room.Name</option>
+                    }
+                </select>
+            </div>
 
-        <input type="date" @bind="_inputModel.Date" @bind:format="yyyy-MM-dd">
+            <div class="col">
+                <input class="form-control" type="date" @bind="_inputModel.Date" @bind:format="yyyy-MM-dd">
+            </div>
 
-        <button type="submit">Select</button>
+            <div class="col">
+                <button class="btn btn-primary" type="submit">Select</button>
+            </div>
+        </div>
     </EditForm>
 
     <hr/>
 
-    <table class="table">
+    <table class="table table-striped">
         <thead>
         <tr>
             <th>Date</th>
@@ -68,8 +78,8 @@ else
             var expiresIn = Math.Max(0, (int)(_reservation.ExpiresOn!.Value - DateTimeOffset.UtcNow).TotalSeconds);
 
             <p>Reservation expires in @(expiresIn) seconds.</p>
-            <button type="submit" onclick="@CancelReservation">Cancel</button>
-            <button type="submit" onclick="@CompleteBooking">Book</button>
+            <button class="btn btn-danger" type="submit" onclick="@CancelReservation">Cancel</button>
+            <button class="btn btn-primary" type="submit" onclick="@CompleteBooking">Book</button>
         }
         else
         {
@@ -93,11 +103,15 @@ else
 
     private readonly InputModel _inputModel = new();
     private Reservation? _reservation;
-    private Timer? _timer;
-    private string? _observedRoomId;
+    private Timer? _reservationTimer;
+
+    private volatile string? _observedRoomId;
+    private Timer? _roomObserverTimer;
 
     protected override async Task OnInitializedAsync()
     {
+        _roomObserverTimer = new Timer(ResubscribeToRoom,  null, 0, 5000);
+
         var catalog = ClusterClient.GetGrain<IRoomCatalogGrain>(0);
         _rooms = await catalog.GetRooms();
         _inputModel.RoomId = _rooms.FirstOrDefault()?.Id;
@@ -115,16 +129,16 @@ else
         var observer = ClusterClient.CreateObjectReference<IRoomObserver>(this);
         await room.Subscribe(observer);
 
+        // Remember the observed room.
+        var oldObserverRoomId = _observedRoomId;
+        _observedRoomId = _inputModel.RoomId;
+
         // Unsubscribe from the previous room.
-        if (_observedRoomId is not null
-            && _observedRoomId != _inputModel.RoomId)
+        if (oldObserverRoomId is not null && oldObserverRoomId != _inputModel.RoomId)
         {
             room = ClusterClient.GetGrain<IRoomGrain>(_observedRoomId);
             await room.Unsubscribe(observer);
         }
-
-        // Remember the observed room.
-        _observedRoomId = _inputModel.RoomId;
     }
 
     private async Task Reserve(string timeSlotId)
@@ -137,12 +151,12 @@ else
 
         if (!reservation.Success)
         {
-            await JsRuntime.InvokeVoidAsync("alert", "Reservation failed");
+            ToastService.ShowError("Reservation failed.");
             return;
         }
 
         _reservation = reservation;
-        _timer = new Timer(Tick, null, 0, 1000);
+        _reservationTimer = new Timer(Tick, null, 0, 1000);
     }
 
     private async Task CancelReservation()
@@ -155,9 +169,14 @@ else
         var timeSlot = ClusterClient.GetGrain<ITimeSlotGrain>(_reservation.TimeSlotId);
         var success = await timeSlot.CancelReservation(_reservation.ReservationId!);
 
-        await JsRuntime.InvokeVoidAsync("alert", success
-            ? "Reservation cancelled successfully"
-            : "Unable to cancel reservation");
+        if (success)
+        {
+            ToastService.ShowSuccess("Reservation cancelled");
+        }
+        else
+        {
+            ToastService.ShowError("Unable to cancel reservation");
+        }
 
         _reservation = null;
         await ClearSelected();
@@ -173,22 +192,25 @@ else
         var timeSlot = ClusterClient.GetGrain<ITimeSlotGrain>(_reservation.TimeSlotId);
         var success = await timeSlot.Book(_reservation.ReservationId!);
 
-        await JsRuntime.InvokeVoidAsync("alert", success
-            ? "Booking completed successfully"
-            : "Unable to complete booking");
+        if (success)
+        {
+            ToastService.ShowSuccess("Booking completed");
+        }
+        else
+        {
+            ToastService.ShowError("Unable to complete booking");
+        }
 
         _reservation = null;
         await ClearSelected();
     }
 
-    private void Tick(object? _) => InvokeAsync(StateHasChanged);
-
     private async Task ClearSelected()
     {
-        if (_timer is not null)
+        if (_reservationTimer is not null)
         {
-            await _timer.DisposeAsync();
-            _timer = null;
+            await _reservationTimer.DisposeAsync();
+            _reservationTimer = null;
         }
 
         if (_reservation is not null)
@@ -201,7 +223,7 @@ else
 
     public async Task OnReservationExpired()
     {
-        await JsRuntime.InvokeVoidAsync("alert", "Reservation expired");
+        ToastService.ShowWarning("Reservation expired");
 
         _reservation = null;
         await ClearSelected();
@@ -224,9 +246,14 @@ else
 
     public async ValueTask DisposeAsync()
     {
-        if (_timer is not null)
+        if (_roomObserverTimer is not null)
         {
-            await _timer.DisposeAsync();
+            await _roomObserverTimer.DisposeAsync();
+        }
+
+        if (_reservationTimer is not null)
+        {
+            await _reservationTimer.DisposeAsync();
         }
 
         // Stop observing room.
@@ -237,4 +264,17 @@ else
             await room.Unsubscribe(observer);
         }
     }
+
+    private async void ResubscribeToRoom(object? _)
+    {
+        // Resubscribe to room periodically, as observers are not persisted.
+        if (_observedRoomId is not null)
+        {
+            var room = ClusterClient.GetGrain<IRoomGrain>(_observedRoomId);
+            var observer = ClusterClient.CreateObjectReference<IRoomObserver>(this);
+            await room.Subscribe(observer);
+        }
+    }
+
+    private async void Tick(object? _) => await InvokeAsync(StateHasChanged);
 }

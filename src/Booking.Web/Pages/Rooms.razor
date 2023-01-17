@@ -18,9 +18,10 @@ else
     <EditForm Model="@_inputModel" OnValidSubmit="@AddRoom">
         <DataAnnotationsValidator />
 
-        <InputText id="name" @bind-Value="_inputModel.Name" />
-
-        <button type="submit">Submit</button>
+        <div class="input-group">
+            <InputText class="form-control" id="name" @bind-Value="_inputModel.Name" />
+            <button class="btn btn-primary" type="submit">Add room</button>
+        </div>
     </EditForm>
 
     <hr/>
