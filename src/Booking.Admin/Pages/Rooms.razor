@@ -31,6 +31,7 @@ else
         <tr>
             <th>Id</th>
             <th>Name</th>
+            <th></th>
         </tr>
         </thead>
         <tbody>
@@ -39,6 +40,7 @@ else
             <tr>
                 <td>@room.Id</td>
                 <td>@room.Name</td>
+                <td><button class="btn btn-danger" onclick="@(() => RemoveRoom(room.Id))">Remove</button></td>
             </tr>
         }
         </tbody>
@@ -67,5 +69,14 @@ else
         await catalog.AddRoom(_inputModel.Name!);
         _inputModel = new InputModel();
         _rooms = await catalog.GetRooms();
+    }
+
+    private async Task RemoveRoom(string id)
+    {
+        var catalog = ClusterClient.GetGrain<IRoomCatalogGrain>(0);
+        await catalog.DeleteRoom(id);
+        _rooms = await catalog.GetRooms();
+
+        StateHasChanged();
     }
 }

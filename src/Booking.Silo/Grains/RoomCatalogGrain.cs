@@ -39,6 +39,16 @@ public class RoomCatalogGrain : Grain, IRoomCatalogGrain
         UpdateCache();
     }
 
+    public async Task DeleteRoom(string id)
+    {
+        if (_state.State.Rooms.Remove(id))
+        {
+            await _state.WriteStateAsync();
+
+            UpdateCache();
+        }
+    }
+
     private void UpdateCache() =>
         _rooms = _state.State.Rooms
             .Select(x => new Room(x.Key, x.Value))

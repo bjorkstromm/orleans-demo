@@ -8,4 +8,6 @@ public interface IRoomCatalogGrain : IGrainWithIntegerKey
     Task<IReadOnlyCollection<Room>> GetRooms();
 
     Task AddRoom(string name);
+
+    Task DeleteRoom(string id);
 }
