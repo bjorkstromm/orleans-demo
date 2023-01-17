@@ -29,6 +29,7 @@ az acr login --name $acrName
 docker push "$acrName.azurecr.io/booking.silo:$version"
 docker push "$acrName.azurecr.io/booking.dashboard:$version"
 docker push "$acrName.azurecr.io/booking.web:$version"
+docker push "$acrName.azurecr.io/booking.admin:$version"
 
 # ACR logout
 docker logout "$acrName.azurecr.io"
