@@ -1,0 +1,41 @@
+@page "/simulate"
+@using Microsoft.AspNetCore.Components
+@using System.ComponentModel.DataAnnotations
+@inject IClusterClient ClusterClient
+
+<PageTitle>Simulate</PageTitle>
+
+<h1>Simulate</h1>
+
+
+<EditForm Model="@_inputModel" OnValidSubmit="@Start">
+    <DataAnnotationsValidator />
+
+    <div class="input-group">
+        <InputNumber class="form-control" id="name" @bind-Value="_inputModel.Count" />
+        <button class="btn btn-primary" type="submit">Simulate</button>
+    </div>
+</EditForm>
+
+@code {
+
+    public class InputModel
+    {
+        [Required]
+        public int? Count { get; set; }
+    }
+
+    private readonly InputModel _inputModel = new();
+
+    private async Task Start()
+    {
+        var tasks = Enumerable.Range(0, _inputModel.Count ?? 0)
+            .Select(async _ =>
+            {
+                var grain = ClusterClient.GetGrain<IUserSimulatorGrain>(Guid.NewGuid());
+                await grain.Start();
+            });
+
+        await Task.WhenAll(tasks);
+    }
+}
