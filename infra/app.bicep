@@ -1,4 +1,6 @@
 param version string
+param aadDomain string
+param aadClientId string
 param location string = resourceGroup().location
 
 var name = 'mb-orleans-demo'
@@ -172,6 +174,73 @@ resource webContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
             {
               name: 'MANAGEDIDENTITY_CLIENTID'
               value: managedIdentity.properties.clientId
+            }
+          ]
+        }
+      ]
+      scale: {
+        minReplicas: 1
+        maxReplicas: 1
+      }
+    }
+  }
+}
+
+// Web
+resource adminContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
+  name: 'booking-admin'
+  location: location
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${managedIdentity.id}': {}
+    }
+  }
+  properties: {
+    managedEnvironmentId: containerAppEnvironment.id
+    configuration: {
+      activeRevisionsMode: 'Single'
+      registries: [
+        {
+          server: containerRegistry.properties.loginServer
+          identity: managedIdentity.id
+        }
+      ]
+      ingress: {
+        external: true
+        targetPort: 80
+        transport: 'auto'
+      }
+    }
+    template: {
+      containers: [
+        {
+          image: '${containerRegistry.properties.loginServer}/booking.admin:${version}'
+          name: 'booking-admin'
+          env: [
+            {
+              name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+              value: appInsights.properties.ConnectionString
+            }
+            {
+              name: 'AZURE_STORAGE_NAME'
+              value: storageAccount.name
+            }
+            {
+              name: 'MANAGEDIDENTITY_CLIENTID'
+              value: managedIdentity.properties.clientId
+            }
+            {
+              name: 'AzureAd__Domain'
+              value: aadDomain
+            }
+            {
+              name: 'AzureAd__TenantId'
+              value: subscription().tenantId
+            }
+            {
+              name: 'AzureAd__ClientId'
+              value: aadClientId
             }
           ]
         }
