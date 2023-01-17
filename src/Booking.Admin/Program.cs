@@ -1,9 +1,38 @@
+using Azure.Identity;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Identity.Web;
 using Microsoft.Identity.Web.UI;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseOrleansClient(clientBuilder =>
+{
+    var storageName = builder.Configuration.GetValue<string>("AZURE_STORAGE_NAME");
+    var managedIdentityClientId = builder.Configuration.GetValue<string>("MANAGEDIDENTITY_CLIENTID");
+    var connectionString = builder.Configuration.GetValue<string>("AzureWebJobsStorage");
+    var useManagedIdentity = !string.IsNullOrWhiteSpace(storageName) && !string.IsNullOrWhiteSpace(managedIdentityClientId);
+
+    clientBuilder.UseAzureStorageClustering(
+        options =>
+        {
+            if (useManagedIdentity)
+            {
+                var uri = new Uri($"https://{storageName}.table.core.windows.net/");
+                options.ConfigureTableServiceClient(uri, new DefaultAzureCredential(new DefaultAzureCredentialOptions
+                {
+                    ManagedIdentityClientId = managedIdentityClientId
+                }));
+            }
+            else
+            {
+                options.ConfigureTableServiceClient(connectionString);
+            }
+        });
+});
+
+// Add services to the container.
+builder.Services.AddApplicationInsightsTelemetry();
 
 builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
     .AddMicrosoftIdentityWebApp(builder.Configuration.GetSection("AzureAd"));
@@ -28,6 +57,16 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 var app = builder.Build();
 
 app.UseForwardedHeaders();
+
+// For some reason forwarded headers are not working in Azure Container Aoos
+if (!app.Environment.IsDevelopment())
+{
+    app.Use((context, next) =>
+    {
+        context.Request.Scheme = "https";
+        return next(context);
+    });
+}
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
