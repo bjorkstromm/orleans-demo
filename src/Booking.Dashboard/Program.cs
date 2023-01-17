@@ -35,6 +35,22 @@ builder.Host.UseOrleans((context, siloBuilder) =>
                 options.ConfigureTableServiceClient(connectionString);
             }
         });
+    siloBuilder.UseAzureTableReminderService(
+        options =>
+        {
+            if (useManagedIdentity)
+            {
+                var uri = new Uri($"https://{storageName}.table.core.windows.net/");
+                options.ConfigureTableServiceClient(uri, new DefaultAzureCredential(new DefaultAzureCredentialOptions
+                {
+                    ManagedIdentityClientId = managedIdentityClientId
+                }));
+            }
+            else
+            {
+                options.ConfigureTableServiceClient(connectionString);
+            }
+        });
     siloBuilder.UseDashboard();
 });
 
