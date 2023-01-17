@@ -4,7 +4,6 @@ namespace Booking.Grains;
 
 public class RoomCatalogGrain : Grain, IRoomCatalogGrain
 {
-    private IReadOnlyCollection<Room> _rooms = Array.Empty<Room>();
     private readonly IPersistentState<State> _state;
 
     [GenerateSerializer]
@@ -20,14 +19,15 @@ public class RoomCatalogGrain : Grain, IRoomCatalogGrain
         _state = state;
     }
 
-    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    public Task<IReadOnlyCollection<Room>> GetRooms()
     {
-        UpdateCache();
+        var rooms = _state.State.Rooms
+            .Select(x => new Room(x.Key, x.Value))
+            .OrderBy(x => x.Name)
+            .ToArray();
 
-        return base.OnActivateAsync(cancellationToken);
+        return Task.FromResult<IReadOnlyCollection<Room>>(rooms);
     }
-
-    public Task<IReadOnlyCollection<Room>> GetRooms() => Task.FromResult(_rooms);
 
     public async Task AddRoom(string name)
     {
@@ -35,13 +35,5 @@ public class RoomCatalogGrain : Grain, IRoomCatalogGrain
         _state.State.Rooms.Add(id, name);
 
         await _state.WriteStateAsync();
-
-        UpdateCache();
     }
-
-    private void UpdateCache() =>
-        _rooms = _state.State.Rooms
-            .Select(x => new Room(x.Key, x.Value))
-            .OrderBy(x => x.Name)
-            .ToArray();
 }
