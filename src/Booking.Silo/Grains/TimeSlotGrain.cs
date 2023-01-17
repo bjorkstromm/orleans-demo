@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
 namespace Booking.Grains;
@@ -6,6 +7,7 @@ public class TimeSlotGrain : Grain, ITimeSlotGrain, IRemindable
 {
     private readonly IPersistentState<State> _state;
     private readonly IGrainFactory _grainFactory;
+    private readonly ILogger<TimeSlotGrain> _logger;
     private IReservationObserver? _observer;
 
     private const string ClearReservationReminder = nameof(ClearReservationReminder);
@@ -21,10 +23,12 @@ public class TimeSlotGrain : Grain, ITimeSlotGrain, IRemindable
 
     public TimeSlotGrain(
         [PersistentState("timeslot")] IPersistentState<State> state,
-        IGrainFactory grainFactory)
+        IGrainFactory grainFactory,
+        ILogger<TimeSlotGrain> logger)
     {
         _state = state;
         _grainFactory = grainFactory;
+        _logger = logger;
     }
 
     public async Task<Reservation> Reserve(IReservationObserver observer)
@@ -76,6 +80,9 @@ public class TimeSlotGrain : Grain, ITimeSlotGrain, IRemindable
         var room = _grainFactory.GetGrain<IRoomGrain>(timeSlot.RoomId);
         await room.SetAvailability(timeSlot with { Available = true });
 
+        var reminder = await this.GetReminder(ClearReservationReminder);
+        await this.UnregisterReminder(reminder);
+
         _observer = null;
 
         return true;
@@ -89,7 +96,6 @@ public class TimeSlotGrain : Grain, ITimeSlotGrain, IRemindable
         }
 
         var reminder = await this.GetReminder(ClearReservationReminder);
-
         await this.UnregisterReminder(reminder);
 
         _observer = null;
@@ -116,7 +122,14 @@ public class TimeSlotGrain : Grain, ITimeSlotGrain, IRemindable
 
             if (_observer is not null)
             {
-                await _observer.OnReservationExpired();
+                try
+                {
+                    await _observer.OnReservationExpired();
+                }
+                catch (Exception e)
+                {
+                    _logger.LogError(e, "Unhandled exception occured while notifying observer");
+                }
                 _observer = null;
             }
         }
