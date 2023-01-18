@@ -13,9 +13,6 @@ Write-Host "Start deployment of version: $version"
 # Build silo
 docker build -t "$acrName.azurecr.io/booking.silo:$version" -f ./src/Booking.Silo/Dockerfile .
 
-# Build dashboard
-docker build -t "$acrName.azurecr.io/booking.dashboard:$version" -f ./src/Booking.Dashboard/Dockerfile .
-
 # Build web
 docker build -t "$acrName.azurecr.io/booking.web:$version" -f ./src/Booking.Web/Dockerfile .
 
@@ -27,7 +24,6 @@ az acr login --name $acrName
 
 # Push images
 docker push "$acrName.azurecr.io/booking.silo:$version"
-docker push "$acrName.azurecr.io/booking.dashboard:$version"
 docker push "$acrName.azurecr.io/booking.web:$version"
 docker push "$acrName.azurecr.io/booking.admin:$version"
 

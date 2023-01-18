@@ -46,6 +46,11 @@ resource siloContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
           identity: managedIdentity.id
         }
       ]
+      ingress: {
+        external: true
+        targetPort: 80
+        transport: 'auto'
+      }
     }
     template: {
       containers: [
@@ -71,61 +76,6 @@ resource siloContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
       scale: {
         minReplicas: 2
         maxReplicas: 2
-      }
-    }
-  }
-}
-
-// Dashboard
-resource dashboardContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
-  name: 'booking-dashboard'
-  location: location
-  identity: {
-    type: 'UserAssigned'
-    userAssignedIdentities: {
-      '${managedIdentity.id}': {}
-    }
-  }
-  properties: {
-    managedEnvironmentId: containerAppEnvironment.id
-    configuration: {
-      activeRevisionsMode: 'Single'
-      registries: [
-        {
-          server: containerRegistry.properties.loginServer
-          identity: managedIdentity.id
-        }
-      ]
-      ingress: {
-        external: true
-        targetPort: 80
-        transport: 'auto'
-      }
-    }
-    template: {
-      containers: [
-        {
-          image: '${containerRegistry.properties.loginServer}/booking.dashboard:${version}'
-          name: 'booking-dashboard'
-          env: [
-            {
-              name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
-              value: appInsights.properties.ConnectionString
-            }
-            {
-              name: 'AZURE_STORAGE_NAME'
-              value: storageAccount.name
-            }
-            {
-              name: 'MANAGEDIDENTITY_CLIENTID'
-              value: managedIdentity.properties.clientId
-            }
-          ]
-        }
-      ]
-      scale: {
-        minReplicas: 1
-        maxReplicas: 1
       }
     }
   }

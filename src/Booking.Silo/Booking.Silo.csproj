@@ -18,6 +18,7 @@
         <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" Version="7.0.0" />
         <PackageReference Include="Microsoft.Orleans.Persistence.AzureStorage" Version="7.0.0" />
         <PackageReference Include="Microsoft.Orleans.Reminders.AzureStorage" Version="7.0.0" />
+        <PackageReference Include="OrleansDashboard" Version="7.0.2" />
         <PackageReference Include="Microsoft.ApplicationInsights.WorkerService" Version="2.13.1" />
     </ItemGroup>
 

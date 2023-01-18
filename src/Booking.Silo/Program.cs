@@ -72,5 +72,12 @@ await Host.CreateDefaultBuilder(args)
                     options.ConfigureTableServiceClient(connectionString);
                 }
             });
+        builder.UseDashboard(options =>
+        {
+            options.Host = "*";
+            options.Port = 80;
+            options.HostSelf = true;
+            options.CounterUpdateIntervalMs = 1000;
+        });
     })
     .RunConsoleAsync();
