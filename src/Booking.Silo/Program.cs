@@ -1,12 +1,11 @@
 ﻿using System.Net;
 using Azure.Identity;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
 
-await Host.CreateDefaultBuilder(args)
-    .UseOrleans((context, builder) =>
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Host
+    .UseOrleans((context, siloBuilder) =>
     {
         var storageName = context.Configuration.GetValue<string>("AZURE_STORAGE_NAME");
         var managedIdentityClientId = context.Configuration.GetValue<string>("MANAGEDIDENTITY_CLIENTID");
@@ -15,16 +14,16 @@ await Host.CreateDefaultBuilder(args)
 
         if (context.HostingEnvironment.IsDevelopment())
         {
-            builder.ConfigureEndpoints(IPAddress.Loopback, siloPort: 11_111, gatewayPort: 30_000);
+            siloBuilder.ConfigureEndpoints(IPAddress.Loopback, siloPort: 11_111, gatewayPort: 30_000);
         }
 
-        builder.Services.AddApplicationInsightsTelemetryWorkerService();
+        siloBuilder.Services.AddApplicationInsightsTelemetryWorkerService();
 
-        builder.Configure<SiloOptions>(options =>
+        siloBuilder.Configure<SiloOptions>(options =>
         {
             options.SiloName = "Booking.Silo";
         });
-        builder.UseAzureStorageClustering(
+        siloBuilder.UseAzureStorageClustering(
             options =>
             {
                 if (useManagedIdentity)
@@ -40,7 +39,7 @@ await Host.CreateDefaultBuilder(args)
                     options.ConfigureTableServiceClient(connectionString);
                 }
             });
-        builder.AddAzureBlobGrainStorageAsDefault(
+        siloBuilder.AddAzureBlobGrainStorageAsDefault(
             options =>
             {
                 if (useManagedIdentity)
@@ -56,7 +55,7 @@ await Host.CreateDefaultBuilder(args)
                     options.ConfigureBlobServiceClient(connectionString);
                 }
             });
-        builder.UseAzureTableReminderService(
+        siloBuilder.UseAzureTableReminderService(
             options =>
             {
                 if (useManagedIdentity)
@@ -72,12 +71,10 @@ await Host.CreateDefaultBuilder(args)
                     options.ConfigureTableServiceClient(connectionString);
                 }
             });
-        builder.UseDashboard(options =>
-        {
-            options.Host = "*";
-            options.Port = 80;
-            options.HostSelf = true;
-            options.CounterUpdateIntervalMs = 1000;
-        });
-    })
-    .RunConsoleAsync();
+        siloBuilder.UseDashboard();
+    });
+
+var app = builder.Build();
+
+app.UseOrleansDashboard();
+app.Run();
