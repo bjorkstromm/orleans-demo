@@ -22,21 +22,31 @@ public class UserSimulatorGrain : Grain, IUserSimulatorGrain, IRemindable, IRese
         _grainFactory = grainFactory;
     }
 
-    public Task Start()
+    public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
     {
-        this.RegisterOrUpdateReminder("reminder",
+        // if we are getting deactivated, due to silo going down,
+        // let's re-register the timer so that we'll hopefully wake up in another silo after 5 seconds
+        if (_state.State.Count < 100)
+        {
+            await this.RegisterOrUpdateReminder("reminder",
+                TimeSpan.FromSeconds(5),
+                TimeSpan.FromMinutes(1));
+        }
+    }
+
+    public async Task Start()
+    {
+        await this.RegisterOrUpdateReminder("reminder",
             TimeSpan.Zero,
             TimeSpan.FromMinutes(1));
 
         _timer = RegisterTimer(OnTick, null, TimeSpan.FromSeconds(Random.Shared.Next(10)), TimeSpan.FromSeconds(5));
-
-        return Task.CompletedTask;
     }
 
     private async Task OnTick(object? state)
     {
         // End after 1000 iterations
-        if (_state.State.Count > 100)
+        if (_state.State.Count >= 100)
         {
             _timer?.Dispose();
 
@@ -47,7 +57,7 @@ public class UserSimulatorGrain : Grain, IUserSimulatorGrain, IRemindable, IRese
         var rooms = await catalog.GetRooms();
 
         var roomId = rooms.ToArray()[Random.Shared.Next(rooms.Count)].Id;
-        var date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(Random.Shared.Next(1, 30)));
+        var date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(Random.Shared.Next(1, 365)));
 
         var roomGrain = _grainFactory.GetGrain<IRoomGrain>(roomId);
         var timeSlots = await roomGrain.GetTimeSlots(date);
@@ -71,12 +81,12 @@ public class UserSimulatorGrain : Grain, IUserSimulatorGrain, IRemindable, IRese
 
     public async Task ReceiveReminder(string reminderName, TickStatus status)
     {
-        // End after 100 iterations
+        // Wake up timer if it's not running
         if (_state.State.Count < 100 && _timer is null)
         {
             _timer = RegisterTimer(OnTick, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5));
         }
-        else
+        else if (_state.State.Count >= 100) // End after 100 iterations
         {
             var reminder = await this.GetReminder(reminderName);
             await this.UnregisterReminder(reminder);
