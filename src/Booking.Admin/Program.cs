@@ -1,4 +1,9 @@
 using Azure.Identity;
+using Azure.Monitor.OpenTelemetry.Exporter;
+using OpenTelemetry;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,6 +36,42 @@ builder.Host.UseOrleansClient(clientBuilder =>
 builder.Services.AddApplicationInsightsTelemetry();
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
+
+var applicationInsightsConnectionString = builder.Configuration.GetValue<string>("APPLICATIONINSIGHTS_CONNECTION_STRING");
+
+builder.Services.AddOpenTelemetry()
+    .WithMetrics(metrics =>
+    {
+        metrics.AddAspNetCoreInstrumentation();
+        metrics.AddMeter("Microsoft.Orleans");
+
+        if (!string.IsNullOrWhiteSpace(applicationInsightsConnectionString))
+        {
+            metrics.AddAzureMonitorMetricExporter(options =>
+            {
+                options.ConnectionString = applicationInsightsConnectionString;
+            });
+        }
+    })
+    .WithTracing(tracing =>
+    {
+        tracing.SetResourceBuilder(ResourceBuilder
+            .CreateDefault()
+            .AddService(serviceName: "booking-admin"));
+
+        tracing.AddAspNetCoreInstrumentation();
+        tracing.AddSource("Microsoft.Orleans.Runtime");
+        tracing.AddSource("Microsoft.Orleans.Application");
+        tracing.AddSource("Booking");
+
+        if (!string.IsNullOrWhiteSpace(applicationInsightsConnectionString))
+        {
+            tracing.AddAzureMonitorTraceExporter(options =>
+            {
+                options.ConnectionString = applicationInsightsConnectionString;
+            });
+        }
+    }).StartWithHost();
 
 var app = builder.Build();
 
