@@ -2,6 +2,7 @@
 using Azure.Identity;
 using Azure.Monitor.OpenTelemetry.Exporter;
 using OpenTelemetry;
+using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -84,11 +85,21 @@ builder.Host
 
 var applicationInsightsConnectionString = builder.Configuration.GetValue<string>("APPLICATIONINSIGHTS_CONNECTION_STRING");
 
+var otResourceBuilder = ResourceBuilder
+    .CreateDefault()
+    .AddService(serviceName: "booking-silo");
+
+builder.Logging.AddOpenTelemetry(options => options
+    .SetResourceBuilder(otResourceBuilder)
+    .AddOtlpExporter());
+
 builder.Services.AddOpenTelemetry()
     .WithMetrics(metrics =>
     {
-        metrics.AddAspNetCoreInstrumentation();
-        metrics.AddMeter("Microsoft.Orleans");
+        metrics
+            .SetResourceBuilder(otResourceBuilder)
+            .AddAspNetCoreInstrumentation()
+            .AddMeter("Microsoft.Orleans");
 
         if (!string.IsNullOrWhiteSpace(applicationInsightsConnectionString))
         {
@@ -98,20 +109,14 @@ builder.Services.AddOpenTelemetry()
             });
         }
     })
-    .WithTracing(tracing =>
-    {
-        tracing.SetResourceBuilder(ResourceBuilder
-            .CreateDefault()
-            .AddService(serviceName: "booking-silo"));
-
-        tracing.AddAspNetCoreInstrumentation();
-        tracing.AddSource("Microsoft.Orleans.Runtime");
-        tracing.AddSource("Microsoft.Orleans.Application");
-        tracing.AddSource("Booking");
-
-        tracing.AddOtlpExporter();
-
-    }).StartWithHost();
+    .WithTracing(tracing => tracing
+        .SetResourceBuilder(otResourceBuilder)
+        .AddAspNetCoreInstrumentation()
+        .AddSource("Microsoft.Orleans.Runtime")
+        .AddSource("Microsoft.Orleans.Application")
+        .AddSource("Booking")
+        .AddOtlpExporter())
+    .StartWithHost();
 
 var app = builder.Build();
 

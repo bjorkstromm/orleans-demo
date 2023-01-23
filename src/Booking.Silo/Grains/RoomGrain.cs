@@ -7,6 +7,7 @@ namespace Booking.Grains;
 public class RoomGrain : Grain, IRoomGrain
 {
     private readonly IPersistentState<State> _state;
+    private readonly ILogger<RoomGrain> _logger;
     private readonly ObserverManager<IRoomObserver> _observers;
 
     [GenerateSerializer]
@@ -21,11 +22,14 @@ public class RoomGrain : Grain, IRoomGrain
         ILogger<RoomGrain> logger)
     {
         _state = state;
+        _logger = logger;
         _observers = new ObserverManager<IRoomObserver>(TimeSpan.FromMinutes(5), logger);
     }
 
     public Task<IReadOnlyCollection<TimeSlot>> GetTimeSlots(DateOnly date)
     {
+        _logger.LogInformation("Returning time slots for {Date}", date);
+
         var slots =
             Enumerable.Range(0, 8)
                 .Select(offset => new TimeSlot(
