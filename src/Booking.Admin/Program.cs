@@ -64,13 +64,7 @@ builder.Services.AddOpenTelemetry()
         tracing.AddSource("Microsoft.Orleans.Application");
         tracing.AddSource("Booking");
 
-        if (!string.IsNullOrWhiteSpace(applicationInsightsConnectionString))
-        {
-            tracing.AddAzureMonitorTraceExporter(options =>
-            {
-                options.ConnectionString = applicationInsightsConnectionString;
-            });
-        }
+        tracing.AddOtlpExporter();
     }).StartWithHost();
 
 var app = builder.Build();

@@ -76,6 +76,31 @@ resource rbacStorageBlobContributor 'Microsoft.Authorization/roleAssignments@202
   }
 }
 
+resource vnet 'Microsoft.Network/virtualNetworks@2021-08-01' = {
+  name: '${name}-vnet'
+  location: location
+  properties: {
+    addressSpace: {
+      addressPrefixes: [
+        '10.0.0.0/16'
+      ]
+    }
+    subnets: [
+      {
+        name: '${name}-subnet'
+        properties: {
+          addressPrefix: '10.0.0.0/21'
+        }
+      }
+    ]
+  }
+}
+
+resource subnet 'Microsoft.Network/virtualNetworks/subnets@2020-06-01' existing = {
+  parent: vnet
+  name: '${name}-subnet'
+}
+
 resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2022-03-01' = {
   name: '${name}-env'
   location: location
@@ -86,6 +111,10 @@ resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2022-03-01' 
         customerId: logAnalyticsWorkspace.properties.customerId
         sharedKey: logAnalyticsWorkspace.listKeys().primarySharedKey
       }
+    }
+    vnetConfiguration: {
+      infrastructureSubnetId: subnet.id
+      internal: false
     }
   }
 }
