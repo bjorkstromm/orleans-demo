@@ -29,6 +29,8 @@
 
     private async Task Start()
     {
+        using var _ = ActivityScope.Create(nameof(Start));
+
         var tasks = Enumerable.Range(0, _inputModel.Count ?? 0)
             .Select(async _ =>
             {

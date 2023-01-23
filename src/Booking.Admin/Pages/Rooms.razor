@@ -59,12 +59,16 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        using var _ = ActivityScope.Create(nameof(OnInitializedAsync));
+
         var catalog = ClusterClient.GetGrain<IRoomCatalogGrain>(0);
         _rooms = await catalog.GetRooms();
     }
 
     private async Task AddRoom()
     {
+        using var _ = ActivityScope.Create(nameof(AddRoom));
+
         var catalog = ClusterClient.GetGrain<IRoomCatalogGrain>(0);
         await catalog.AddRoom(_inputModel.Name!);
         _inputModel = new InputModel();
@@ -73,6 +77,8 @@ else
 
     private async Task RemoveRoom(string id)
     {
+        using var _ = ActivityScope.Create(nameof(RemoveRoom));
+
         var catalog = ClusterClient.GetGrain<IRoomCatalogGrain>(0);
         await catalog.DeleteRoom(id);
         _rooms = await catalog.GetRooms();

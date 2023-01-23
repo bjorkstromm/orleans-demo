@@ -110,6 +110,8 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        using var _ = ActivityScope.Create(nameof(OnInitializedAsync));
+
         _roomObserverTimer = new Timer(ResubscribeToRoom,  null, 0, 5000);
 
         var catalog = ClusterClient.GetGrain<IRoomCatalogGrain>(0);
@@ -121,6 +123,8 @@ else
 
     private async Task FetchTimeSlots()
     {
+        using var _ = ActivityScope.Create(nameof(FetchTimeSlots));
+
         var room = ClusterClient.GetGrain<IRoomGrain>(_inputModel.RoomId);
 
         _timeSlots = await room.GetTimeSlots(DateOnly.FromDateTime(_inputModel.Date));
@@ -143,6 +147,8 @@ else
 
     private async Task Reserve(string timeSlotId)
     {
+        using var _ = ActivityScope.Create(nameof(Reserve));
+
         await ClearSelected();
 
         var timeSlot = ClusterClient.GetGrain<ITimeSlotGrain>(timeSlotId);
@@ -161,6 +167,8 @@ else
 
     private async Task CancelReservation()
     {
+        using var _ = ActivityScope.Create(nameof(CancelReservation));
+
         if (_reservation is null)
         {
             return;
@@ -184,6 +192,8 @@ else
 
     private async Task CompleteBooking()
     {
+        using var _ = ActivityScope.Create(nameof(CompleteBooking));
+
         if (_reservation is null)
         {
             return;
