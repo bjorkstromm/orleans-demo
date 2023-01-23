@@ -37,7 +37,7 @@ resource siloContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
     }
   }
   dependsOn: [
-    tracelensCollectorContainerApp
+    redisContainerApp
   ]
   properties: {
     managedEnvironmentId: containerAppEnvironment.id
@@ -75,7 +75,17 @@ resource siloContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
             }
             {
               name: 'OTEL_EXPORTER_OTLP_ENDPOINT'
-              value: 'http://tracelens-collector.internal.${containerAppEnvironment.properties.defaultDomain}:4317'
+              value: 'http://localhost:4317'
+            }
+          ]
+        }
+        {
+          image: 'docker.io/rogeralsing/tracelens:amd64'
+          name: 'tracelens-collector'
+          env: [
+            {
+              name: 'Redis__Server'
+              value: 'redis'
             }
           ]
         }
@@ -99,7 +109,7 @@ resource webContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
     }
   }
   dependsOn: [
-    tracelensCollectorContainerApp
+    redisContainerApp
   ]
   properties: {
     managedEnvironmentId: containerAppEnvironment.id
@@ -137,7 +147,17 @@ resource webContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
             }
             {
               name: 'OTEL_EXPORTER_OTLP_ENDPOINT'
-              value: 'http://tracelens-collector.internal.${containerAppEnvironment.properties.defaultDomain}:4317'
+              value: 'http://localhost:4317'
+            }
+          ]
+        }
+        {
+          image: 'docker.io/rogeralsing/tracelens:amd64'
+          name: 'tracelens-collector'
+          env: [
+            {
+              name: 'Redis__Server'
+              value: 'redis'
             }
           ]
         }
@@ -161,7 +181,7 @@ resource adminContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
     }
   }
   dependsOn: [
-    tracelensCollectorContainerApp
+    redisContainerApp
   ]
   properties: {
     managedEnvironmentId: containerAppEnvironment.id
@@ -211,7 +231,17 @@ resource adminContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
             }
             {
               name: 'OTEL_EXPORTER_OTLP_ENDPOINT'
-              value: 'http://tracelens-collector.internal.${containerAppEnvironment.properties.defaultDomain}:4317'
+              value: 'http://localhost:4317'
+            }
+          ]
+        }
+        {
+          image: 'docker.io/rogeralsing/tracelens:amd64'
+          name: 'tracelens-collector'
+          env: [
+            {
+              name: 'Redis__Server'
+              value: 'redis'
             }
           ]
         }
@@ -279,80 +309,13 @@ resource redisContainerApp 'Microsoft.App/containerApps@2022-06-01-preview' = {
   }
 }
 
-// PlantUML
-resource plantumlContainerApp 'Microsoft.App/containerApps@2022-06-01-preview' = {
-  name: 'plantuml'
-  location: location
-  properties: {
-    managedEnvironmentId: containerAppEnvironment.id
-    configuration: {
-      activeRevisionsMode: 'Single'
-      ingress: {
-        external: false
-        targetPort: 8080
-        transport: 'http'
-        allowInsecure: true
-      }
-    }
-    template: {
-      containers: [
-        {
-          image: 'plantuml/plantuml-server:tomcat'
-          name: 'plantuml'
-        }
-      ]
-      scale: {
-        minReplicas: 1
-        maxReplicas: 1
-      }
-    }
-  }
-}
-
-// TracelensCollector
-resource tracelensCollectorContainerApp 'Microsoft.App/containerApps@2022-06-01-preview' = {
-  name: 'tracelens-collector'
-  location: location
-  properties: {
-    managedEnvironmentId: containerAppEnvironment.id
-    configuration: {
-      activeRevisionsMode: 'Single'
-      ingress: {
-        external: false
-        targetPort: 4317
-        transport: 'http2'
-        allowInsecure: true
-      }
-    }
-    template: {
-      containers: [
-        {
-          image: 'docker.io/rogeralsing/tracelens:amd64'
-          name: 'tracelens-collector'
-          env: [
-            {
-              name: 'PlantUml__RemoteUrl'
-              value: 'http://plantuml.internal.${containerAppEnvironment.properties.defaultDomain}:8080'
-            }
-            {
-              name: 'Redis__Server'
-              value: 'redis.internal.${containerAppEnvironment.properties.defaultDomain}'
-            }
-          ]
-        }
-      ]
-      scale: {
-        minReplicas: 1
-        maxReplicas: 1
-      }
-    }
-  }
-}
-
 // TracelensUI
 resource tracelensUIContainerApp 'Microsoft.App/containerApps@2022-06-01-preview' = {
   name: 'tracelens-ui'
   location: location
+  dependsOn: [
+    redisContainerApp
+  ]
   properties: {
     managedEnvironmentId: containerAppEnvironment.id
     configuration: {
@@ -360,7 +323,7 @@ resource tracelensUIContainerApp 'Microsoft.App/containerApps@2022-06-01-preview
       ingress: {
         external: true
         targetPort: 5001
-        transport: 'http'
+        transport: 'auto'
       }
     }
     template: {
@@ -371,13 +334,17 @@ resource tracelensUIContainerApp 'Microsoft.App/containerApps@2022-06-01-preview
           env: [
             {
               name: 'PlantUml__RemoteUrl'
-              value: 'http://plantuml.internal.${containerAppEnvironment.properties.defaultDomain}:8080'
+              value: 'http://localhost:8080'
             }
             {
               name: 'Redis__Server'
-              value: 'redis.internal.${containerAppEnvironment.properties.defaultDomain}'
+              value: 'redis'
             }
           ]
+        }
+        {
+          image: 'plantuml/plantuml-server:tomcat'
+          name: 'plantuml'
         }
       ]
       scale: {
