@@ -15,7 +15,8 @@ The system runs on [Azure Container Apps](https://learn.microsoft.com/azure/cont
 ![overview](media/overview.png)
 
 * There's a [room catalog](src/Booking.Abstractions/IRoomCatalogGrain.cs) (a single grain), from where a list of rooms can be fetched. For convenience, Booking.Admin contains a view for adding and deleting rooms.
-  * In a some scenarios, this data would probably come from a source outside the system and only be cached here. That could be done using e.g. [Stateless workers grains](https://learn.microsoft.com/en-us/dotnet/orleans/grains/stateless-worker-grains) in order to have it in-memory on every silo.
+  * Be aware that this design might cause bottlenecks, since we have a single grain that every client will call. If this design is used, it would probably be wise to replicate the data, for faster reads, on each silo using e.g. [Stateless workers grains](https://learn.microsoft.com/en-us/dotnet/orleans/grains/stateless-worker-grains).
+  * In others scenarios, this data would probably come from a source outside the system and only be cached here. That could be done using e.g. [Stateless workers grains](https://learn.microsoft.com/en-us/dotnet/orleans/grains/stateless-worker-grains) in order to have it in-memory on every silo.
 * For each room, there's a [room grain](src/Booking.Abstractions/IRoomGrain.cs), where a list of [timeslots](src/Booking.Abstractions/TimeSlot.cs) per day can be fetched.
   * For convenience, the timeslots are created on-the-fly, but in own real-world scenarios this data might be fetched from outside the system and only cached here.
 * When booking a [time-slot](src/Booking.Abstractions/ITimeSlotGrain.cs), user first need to reserve the time-slot, and happens automatically by clicking a row in the web application. This is mainly used avoid double booking, and to keep the time-slot reserved while the user enters additional information.
