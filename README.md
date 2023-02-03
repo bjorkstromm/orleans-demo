@@ -28,7 +28,4 @@ The system runs on [Azure Container Apps](https://learn.microsoft.com/azure/cont
   * In a real-world scenario, a call to the outside system (database) would be done here to make the actual booking. 
 * There's also possibility of manually cancelling the reservation, which also removes the timer, and updates the availability on the room grain.
 
-In order to provide real-time updates to the end-user, following [Observers](https://learn.microsoft.com/en-us/dotnet/orleans/grains/observers) are present:
-* [Reservation observer](src/Booking.Abstractions/IReservationObserver.cs). This is passed when making a reservation, and is used by the [time-slot](src/Booking.Silo/Grains/TimeSlotGrain.cs) to notify the client that the reservation has expired.
-  * This is probably not necessary, but I added it anyway 🙂
-* [Room observer](src/Booking.Abstractions/IRoomObserver.cs). This is used to subscribe to updates on time-slot availabilities on a specific [room](src/Booking.Silo/Grains/RoomGrain.cs). When a time-slot is reserved, the client can automatically render the slot as not available, and when a reservation is cancelled the client can automatically render the slot as available.
+In order to provide real-time updates to the end-user, a [Observer](https://learn.microsoft.com/en-us/dotnet/orleans/grains/observers) called [Room observer](src/Booking.Abstractions/IRoomObserver.cs) is used. This is mainly for subscribing on updates for time-slot availabilities on a specific [room](src/Booking.Silo/Grains/RoomGrain.cs). When a time-slot is reserved, the client can automatically render the slot as not available, and when a reservation is cancelled the client can automatically render the slot as available.

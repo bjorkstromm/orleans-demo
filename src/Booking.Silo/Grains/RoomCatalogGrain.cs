@@ -4,15 +4,7 @@ namespace Booking.Grains;
 
 public class RoomCatalogGrain : Grain, IRoomCatalogGrain
 {
-    private IReadOnlyCollection<Room> _rooms = Array.Empty<Room>();
     private readonly IPersistentState<State> _state;
-
-    [GenerateSerializer]
-    public record State
-    {
-        [Id(0)]
-        public Dictionary<string, string> Rooms { get; init; } = new();
-    }
 
     public RoomCatalogGrain(
         [PersistentState("rooms")] IPersistentState<State> state)
@@ -20,14 +12,15 @@ public class RoomCatalogGrain : Grain, IRoomCatalogGrain
         _state = state;
     }
 
-    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    public Task<IReadOnlyCollection<Room>> GetRooms()
     {
-        UpdateCache();
+        var rooms = _state.State.Rooms
+            .Select(x => new Room(x.Key, x.Value))
+            .OrderBy(x => x.Name)
+            .ToArray();
 
-        return base.OnActivateAsync(cancellationToken);
+        return Task.FromResult<IReadOnlyCollection<Room>>(rooms);
     }
-
-    public Task<IReadOnlyCollection<Room>> GetRooms() => Task.FromResult(_rooms);
 
     public async Task AddRoom(string name)
     {
@@ -35,8 +28,6 @@ public class RoomCatalogGrain : Grain, IRoomCatalogGrain
         _state.State.Rooms.Add(id, name);
 
         await _state.WriteStateAsync();
-
-        UpdateCache();
     }
 
     public async Task DeleteRoom(string id)
@@ -44,14 +35,13 @@ public class RoomCatalogGrain : Grain, IRoomCatalogGrain
         if (_state.State.Rooms.Remove(id))
         {
             await _state.WriteStateAsync();
-
-            UpdateCache();
         }
     }
 
-    private void UpdateCache() =>
-        _rooms = _state.State.Rooms
-            .Select(x => new Room(x.Key, x.Value))
-            .OrderBy(x => x.Name)
-            .ToArray();
+    [GenerateSerializer]
+    public record State
+    {
+        [Id(0)]
+        public Dictionary<string, string> Rooms { get; init; } = new();
+    }
 }

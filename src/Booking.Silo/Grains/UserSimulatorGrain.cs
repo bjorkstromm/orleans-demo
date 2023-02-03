@@ -2,7 +2,7 @@ using Orleans.Runtime;
 
 namespace Booking.Grains;
 
-public class UserSimulatorGrain : Grain, IUserSimulatorGrain, IRemindable, IReservationObserver
+public class UserSimulatorGrain : Grain, IUserSimulatorGrain, IRemindable
 {
     private readonly IPersistentState<State> _state;
     private readonly IGrainFactory _grainFactory;
@@ -73,7 +73,7 @@ public class UserSimulatorGrain : Grain, IUserSimulatorGrain, IRemindable, IRese
 
         var timeSlotGrain = _grainFactory.GetGrain<ITimeSlotGrain>(timeSlot.Id);
 
-        await timeSlotGrain.Reserve(GrainReference.AsReference<IReservationObserver>());
+        await timeSlotGrain.Reserve();
 
         _state.State.Count++;
         await _state.WriteStateAsync();
@@ -92,6 +92,4 @@ public class UserSimulatorGrain : Grain, IUserSimulatorGrain, IRemindable, IRese
             await this.UnregisterReminder(reminder);
         }
     }
-
-    public Task OnReservationExpired() => Task.CompletedTask;
 }

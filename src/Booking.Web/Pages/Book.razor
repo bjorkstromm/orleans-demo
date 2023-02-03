@@ -1,6 +1,5 @@
 @page "/book"
 @implements IAsyncDisposable
-@implements IReservationObserver
 @implements IRoomObserver
 @using System.ComponentModel.DataAnnotations
 @using Blazored.Toast.Services
@@ -152,8 +151,7 @@ else
         await ClearSelected();
 
         var timeSlot = ClusterClient.GetGrain<ITimeSlotGrain>(timeSlotId);
-        var observer = ClusterClient.CreateObjectReference<IReservationObserver>(this);
-        var reservation = await timeSlot.Reserve(observer);
+        var reservation = await timeSlot.Reserve();
 
         if (!reservation.Success)
         {
@@ -162,7 +160,7 @@ else
         }
 
         _reservation = reservation;
-        _reservationTimer = new Timer(Tick, null, 0, 1000);
+        _reservationTimer = new Timer(TickReservationTimer, null, 0, 1000);
     }
 
     private async Task CancelReservation()
@@ -286,5 +284,14 @@ else
         }
     }
 
-    private async void Tick(object? _) => await InvokeAsync(StateHasChanged);
+    private async void TickReservationTimer(object? _)
+    {
+        if (_reservation?.ExpiresOn <= DateTimeOffset.UtcNow)
+        {
+            await OnReservationExpired();
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
 }

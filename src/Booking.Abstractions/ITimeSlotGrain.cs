@@ -2,7 +2,7 @@ namespace Booking;
 
 public interface ITimeSlotGrain : IGrainWithStringKey
 {
-    Task<Reservation> Reserve(IReservationObserver observer);
+    Task<Reservation> Reserve();
 
     Task<bool> CancelReservation(string reservationId);
 
