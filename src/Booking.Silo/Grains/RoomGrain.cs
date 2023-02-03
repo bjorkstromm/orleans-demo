@@ -7,29 +7,20 @@ namespace Booking.Grains;
 public class RoomGrain : Grain, IRoomGrain
 {
     private readonly IPersistentState<State> _state;
-    private readonly ILogger<RoomGrain> _logger;
     private readonly ObserverManager<IRoomObserver> _observers;
-
-    [GenerateSerializer]
-    public record State
-    {
-        [Id(0)]
-        public HashSet<string> NotAvailable { get; init; } = new();
-    }
 
     public RoomGrain(
         [PersistentState("room")] IPersistentState<State> state,
         ILogger<RoomGrain> logger)
     {
         _state = state;
-        _logger = logger;
         _observers = new ObserverManager<IRoomObserver>(TimeSpan.FromMinutes(5), logger);
     }
 
     public Task<IReadOnlyCollection<TimeSlot>> GetTimeSlots(DateOnly date)
     {
-        _logger.LogInformation("Returning time slots for {Date}", date);
-
+        // Just create some time-slots for the sake of the example.
+        // In a real application, this could come from an external service.
         var slots =
             Enumerable.Range(0, 8)
                 .Select(offset => new TimeSlot(
@@ -38,10 +29,38 @@ public class RoomGrain : Grain, IRoomGrain
                     Start: new TimeOnly(8 + offset, 0),
                     End: new TimeOnly(9 + offset, 0),
                     Available: true))
+                // Set the availability based on the state.
                 .Select(x => x with { Available = !_state.State.NotAvailable.Contains(x.Id) })
                 .ToArray();
 
         return Task.FromResult<IReadOnlyCollection<TimeSlot>>(slots);
+    }
+
+    public async Task SetAvailability(TimeSlot timeSlot)
+    {
+        // Verify that the time-slot is valid.
+        if (timeSlot.RoomId != this.GetPrimaryKeyString())
+        {
+            return;
+        }
+
+        if (timeSlot.Available)
+        {
+            // If time-slot is available, remove it from the list of unavailable time-slots.
+            _state.State.NotAvailable.Remove(timeSlot.Id);
+        }
+        else
+        {
+            // else, add it to the list of unavailable time-slots.
+            _state.State.NotAvailable.Add(timeSlot.Id);
+        }
+
+        // Save state
+        await _state.WriteStateAsync();
+
+        // Notify observers
+        await _observers.Notify(x =>
+            x.OnAvailabilityChanged(timeSlot));
     }
 
     public Task Subscribe(IRoomObserver observer)
@@ -56,24 +75,10 @@ public class RoomGrain : Grain, IRoomGrain
         return Task.CompletedTask;
     }
 
-    public async Task SetAvailability(TimeSlot timeSlot)
+    [GenerateSerializer]
+    public record State
     {
-        if (timeSlot.RoomId != this.GetPrimaryKeyString())
-        {
-            return;
-        }
-
-        if (timeSlot.Available)
-        {
-            _state.State.NotAvailable.Remove(timeSlot.Id);
-        }
-        else
-        {
-            _state.State.NotAvailable.Add(timeSlot.Id);
-        }
-
-        await _state.WriteStateAsync();
-        await _observers.Notify(x =>
-            x.OnAvailabilityChanged(timeSlot));
+        [Id(0)]
+        public HashSet<string> NotAvailable { get; init; } = new();
     }
 }
