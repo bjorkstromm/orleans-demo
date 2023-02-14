@@ -1,5 +1,4 @@
 param version string
-param aadDomain string
 param aadClientId string
 param location string = resourceGroup().location
 
@@ -26,6 +25,79 @@ resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2018-
   name: '${name}-mi'
 }
 
+// Scaler
+resource scalerContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
+  name: 'booking-scaler'
+  location: location
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${managedIdentity.id}': {}
+    }
+  }
+  dependsOn: [
+    redisContainerApp
+  ]
+  properties: {
+    managedEnvironmentId: containerAppEnvironment.id
+    configuration: {
+      activeRevisionsMode: 'Single'
+      registries: [
+        {
+          server: containerRegistry.properties.loginServer
+          identity: managedIdentity.id
+        }
+      ]
+      ingress: {
+        external: true
+        targetPort: 80
+        allowInsecure: true
+        transport: 'http2'
+      }
+    }
+    template: {
+      containers: [
+        {
+          image: '${containerRegistry.properties.loginServer}/booking.scaler:${version}'
+          name: 'booking-scaler'
+          env: [
+            {
+              name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+              value: appInsights.properties.ConnectionString
+            }
+            {
+              name: 'AZURE_STORAGE_NAME'
+              value: storageAccount.name
+            }
+            {
+              name: 'MANAGEDIDENTITY_CLIENTID'
+              value: managedIdentity.properties.clientId
+            }
+            {
+              name: 'OTEL_EXPORTER_OTLP_ENDPOINT'
+              value: 'http://localhost:4317'
+            }
+          ]
+        }
+        {
+          image: 'docker.io/rogeralsing/tracelens:amd64'
+          name: 'tracelens-collector'
+          env: [
+            {
+              name: 'Redis__Server'
+              value: 'redis'
+            }
+          ]
+        }
+      ]
+      scale: {
+        minReplicas: 1
+        maxReplicas: 1
+      }
+    }
+  }
+}
+
 // Silo
 resource siloContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
   name: 'booking-silo'
@@ -42,7 +114,7 @@ resource siloContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
   properties: {
     managedEnvironmentId: containerAppEnvironment.id
     configuration: {
-      activeRevisionsMode: 'Single'
+      activeRevisionsMode: 'Multiple'
       registries: [
         {
           server: containerRegistry.properties.loginServer
@@ -91,8 +163,21 @@ resource siloContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
         }
       ]
       scale: {
-        minReplicas: 2
-        maxReplicas: 2
+        minReplicas: 1
+        maxReplicas: 10
+        rules: [
+          {
+            name: 'scaler'
+            custom: {
+              type: 'external'
+              metadata: {
+                scalerAddress: '${scalerContainerApp.properties.configuration.ingress.fqdn}:80'
+                graintype: 'timeslot'
+                upperbound: '200'
+              }
+            }
+          }
+        ]
       }
     }
   }
@@ -216,18 +301,6 @@ resource adminContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
             {
               name: 'MANAGEDIDENTITY_CLIENTID'
               value: managedIdentity.properties.clientId
-            }
-            {
-              name: 'AzureAd__Domain'
-              value: aadDomain
-            }
-            {
-              name: 'AzureAd__TenantId'
-              value: subscription().tenantId
-            }
-            {
-              name: 'AzureAd__ClientId'
-              value: aadClientId
             }
             {
               name: 'OTEL_EXPORTER_OTLP_ENDPOINT'

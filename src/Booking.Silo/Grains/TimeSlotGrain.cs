@@ -29,7 +29,8 @@ public class TimeSlotGrain : Grain, ITimeSlotGrain, IRemindable
 
     public async Task<Reservation> Reserve()
     {
-        // Because TimeSlot information is encoded in the grain id, try to parse it.
+        // Because TimeSlot information is encoded in the grain id,
+        // try to parse it.
         if (!TimeSlot.TryParse(this.GetPrimaryKeyString(), out var timeSlot))
         {
             return Reservation.Fail;
@@ -41,7 +42,8 @@ public class TimeSlotGrain : Grain, ITimeSlotGrain, IRemindable
             return Reservation.Fail;
         }
 
-        // Create a reservation id, and set reservation expiration time (use 20 seconds for demo purposes)
+        // Create a reservation id, and set reservation
+        // expiration time (use 20 seconds for demo purposes)
         var id = Guid.NewGuid().ToString("N");
         var expiresOn = DateTimeOffset.UtcNow.AddSeconds(20);
 
@@ -53,7 +55,8 @@ public class TimeSlotGrain : Grain, ITimeSlotGrain, IRemindable
         var room = _grainFactory.GetGrain<IRoomGrain>(timeSlot.RoomId);
         await room.SetAvailability(timeSlot with { Available = false });
 
-        // Register a reminder for clearing the reservation after it's expiration.
+        // Register a reminder for clearing the reservation
+        // after it's expiration.
         await this.RegisterOrUpdateReminder(ClearReservationReminder,
             expiresOn - DateTimeOffset.UtcNow,
             TimeSpan.FromMinutes(5));
@@ -98,7 +101,8 @@ public class TimeSlotGrain : Grain, ITimeSlotGrain, IRemindable
         }
 
         // TODO: Make actual booking here :)
-        // Would probably call to an external service, or maybe a different grain.
+        // Would probably call to an external service,
+        // or maybe a different grain.
 
         // Unregister the reminder for clearing reservation.
         // Should not execute because time-slot was booked.
