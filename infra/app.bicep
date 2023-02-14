@@ -114,7 +114,7 @@ resource siloContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
   properties: {
     managedEnvironmentId: containerAppEnvironment.id
     configuration: {
-      activeRevisionsMode: 'Multiple'
+      activeRevisionsMode: 'Single'
       registries: [
         {
           server: containerRegistry.properties.loginServer
@@ -173,7 +173,7 @@ resource siloContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
               metadata: {
                 scalerAddress: '${scalerContainerApp.properties.configuration.ingress.fqdn}:80'
                 graintype: 'timeslot'
-                upperbound: '200'
+                upperbound: '300'
               }
             }
           }

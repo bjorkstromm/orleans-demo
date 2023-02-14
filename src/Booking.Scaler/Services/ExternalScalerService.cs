@@ -39,13 +39,12 @@ public class ExternalScalerService : ExternalScaler.ExternalScalerBase
         // scale in
         if (grainsPerSilo < upperbound)
         {
-            metricValue = grainCount == 0 ? 1 : Convert.ToInt16(grainCount / upperbound);
+            metricValue = grainCount == 0 ? 1 : Convert.ToInt16(Math.Ceiling((double)grainCount / (double)upperbound));
         }
-
         // scale out
-        if (grainsPerSilo >= upperbound)
+        else if (grainsPerSilo >= upperbound)
         {
-            metricValue = siloCount + 1;
+            metricValue = Convert.ToInt16(Math.Ceiling((double)grainCount / (double)upperbound));
         }
 
         _logger.LogInformation(
