@@ -1,4 +1,4 @@
-@page "/book"
+@page "/book/{RoomId}"
 @implements IAsyncDisposable
 @implements IRoomObserver
 @using System.ComponentModel.DataAnnotations
@@ -6,11 +6,11 @@
 @inject IClusterClient ClusterClient
 @inject IToastService ToastService
 
-<PageTitle>Book</PageTitle>
+<PageTitle>Bookerizer 3000 - @_roomName</PageTitle>
 
-<h1>Book</h1>
+<h1>@_roomName</h1>
 
-@if (_rooms == null)
+@if (_timeSlots == null)
 {
     <p>
         <em>Loading...</em>
@@ -18,29 +18,21 @@
 }
 else
 {
-    <EditForm Model="@_inputModel" OnValidSubmit="@FetchTimeSlots">
-        <DataAnnotationsValidator />
-
-        <div class="row">
-            <div class="col">
-                <select class="form-select"
-                        @bind="_inputModel.RoomId">
-                    @foreach (var room in _rooms)
-                    {
-                        <option value="@room.Id">@room.Name</option>
-                    }
-                </select>
-            </div>
-
-            <div class="col">
-                <input class="form-control" type="date" @bind="_inputModel.Date" @bind:format="yyyy-MM-dd">
-            </div>
-
-            <div class="col">
-                <button class="btn btn-primary" type="submit">Select</button>
-            </div>
+    <div class="row">
+        <div class="col">
+            <input class="form-control" type="date"
+                   @bind="_inputModel.From"
+                   @bind:after="FetchTimeSlots"
+                   @bind:format="yyyy-MM-dd">
         </div>
-    </EditForm>
+
+        <div class="col">
+            <input class="form-control" type="date"
+                   @bind="_inputModel.To"
+                   @bind:after="FetchTimeSlots"
+                   @bind:format="yyyy-MM-dd">
+        </div>
+    </div>
 
     <hr/>
 
@@ -89,59 +81,53 @@ else
 
 @code {
 
+    [Parameter]
+    public string RoomId { get; set; } = string.Empty;
+    private string? _roomName;
+
     public class InputModel
     {
-        [Required]
-        public string? RoomId { get; set; }
+        public DateTime From { get; set; } = DateTime.Today;
 
-        public DateTime Date { get; set; } = DateTime.Today;
+        public DateTime To { get; set; } = DateTime.Today;
     }
 
-    private IReadOnlyCollection<Room>? _rooms;
     private IReadOnlyCollection<TimeSlot> _timeSlots = Array.Empty<TimeSlot>();
 
     private readonly InputModel _inputModel = new();
     private Reservation? _reservation;
     private Timer? _reservationTimer;
 
-    private volatile string? _observedRoomId;
     private Timer? _roomObserverTimer;
 
     protected override async Task OnInitializedAsync()
     {
         using var _ = ActivityScope.Create(nameof(OnInitializedAsync));
 
-        _roomObserverTimer = new Timer(ResubscribeToRoom,  null, 0, 5000);
-
-        var catalog = ClusterClient.GetGrain<IRoomCatalogGrain>(0);
-        _rooms = await catalog.GetRooms();
-        _inputModel.RoomId = _rooms.FirstOrDefault()?.Id;
-
+        await SetRoomName();
+        await SubscribeToRoom();
         await FetchTimeSlots();
+
+        _roomObserverTimer = new Timer(ResubscribeToRoom,  null, 5000, 5000);
+    }
+
+    private async Task SetRoomName()
+    {
+        var catalog = ClusterClient.GetGrain<IRoomCatalogGrain>(0);
+        var rooms = await catalog.GetRooms();
+
+        _roomName = rooms.FirstOrDefault(x => string.Equals(x.Id, RoomId, StringComparison.Ordinal))?.Name;
     }
 
     private async Task FetchTimeSlots()
     {
         using var _ = ActivityScope.Create(nameof(FetchTimeSlots));
 
-        var room = ClusterClient.GetGrain<IRoomGrain>(_inputModel.RoomId);
+        var room = ClusterClient.GetGrain<IRoomGrain>(RoomId);
 
-        _timeSlots = await room.GetTimeSlots(DateOnly.FromDateTime(_inputModel.Date));
-
-        // Observe changes to the room.
-        var observer = ClusterClient.CreateObjectReference<IRoomObserver>(this);
-        await room.Subscribe(observer);
-
-        // Remember the observed room.
-        var oldObserverRoomId = _observedRoomId;
-        _observedRoomId = _inputModel.RoomId;
-
-        // Unsubscribe from the previous room.
-        if (oldObserverRoomId is not null && oldObserverRoomId != _inputModel.RoomId)
-        {
-            room = ClusterClient.GetGrain<IRoomGrain>(_observedRoomId);
-            await room.Unsubscribe(observer);
-        }
+        _timeSlots = await room.GetTimeSlots(
+            DateOnly.FromDateTime(_inputModel.From),
+            DateOnly.FromDateTime(_inputModel.To));
     }
 
     private async Task Reserve(string timeSlotId)
@@ -229,7 +215,7 @@ else
         }
     }
 
-    public async Task OnReservationExpired()
+    private async Task OnReservationExpired()
     {
         ToastService.ShowWarning("Reservation expired");
 
@@ -240,7 +226,8 @@ else
 
     public async Task OnAvailabilityChanged(TimeSlot timeSlot)
     {
-        if (timeSlot.Date != DateOnly.FromDateTime(_inputModel.Date))
+        if (timeSlot.Date < DateOnly.FromDateTime(_inputModel.From)
+            || timeSlot.Date > DateOnly.FromDateTime(_inputModel.To))
         {
             return;
         }
@@ -265,23 +252,18 @@ else
         }
 
         // Stop observing room.
-        if (_observedRoomId is not null)
-        {
-            var room = ClusterClient.GetGrain<IRoomGrain>(_observedRoomId);
-            var observer = ClusterClient.CreateObjectReference<IRoomObserver>(this);
-            await room.Unsubscribe(observer);
-        }
+        var room = ClusterClient.GetGrain<IRoomGrain>(RoomId);
+        var observer = ClusterClient.CreateObjectReference<IRoomObserver>(this);
+        await room.Unsubscribe(observer);
     }
 
-    private async void ResubscribeToRoom(object? _)
+    private async void ResubscribeToRoom(object? _) => await SubscribeToRoom();
+
+    private async Task SubscribeToRoom()
     {
-        // Resubscribe to room periodically, as observers are not persisted.
-        if (_observedRoomId is not null)
-        {
-            var room = ClusterClient.GetGrain<IRoomGrain>(_observedRoomId);
-            var observer = ClusterClient.CreateObjectReference<IRoomObserver>(this);
-            await room.Subscribe(observer);
-        }
+        var room = ClusterClient.GetGrain<IRoomGrain>(RoomId);
+        var observer = ClusterClient.CreateObjectReference<IRoomObserver>(this);
+        await room.Subscribe(observer);
     }
 
     private async void TickReservationTimer(object? _)

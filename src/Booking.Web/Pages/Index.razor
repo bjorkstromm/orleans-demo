@@ -1,9 +1,64 @@
 ﻿@page "/"
+@inject IClusterClient ClusterClient
 
-<PageTitle>Index</PageTitle>
+<PageTitle>Bookerizer 3000</PageTitle>
 
-<h1>Hello, world!</h1>
+<marquee>
+    <h1>Welcome to Bookerizer 3000! Please select a room to continue!</h1>
+</marquee>
 
-Welcome to your new app.
+@if (_rooms is null)
+{
+    <p>Loading...</p>
+}
 
-<SurveyPrompt Title="How is Blazor working for you?"/>
+else
+{
+    <div class="row row-cols-3 row-cols-md-3 g-4">
+        @foreach(var (i, room) in _rooms.Select((x, i) => (i, x)))
+        {
+            <div class="col">
+                <div class="card h-100">
+                    <img src="@($"img/room{(i % 9) + 1}.jpg")"
+                         class="card-img-top"
+                         alt="Image by <a href='https://pixabay.com/users/pexels-2286921/?utm_source=link-attribution&amp;utm_medium=referral&amp;utm_campaign=image&amp;utm_content=2181994'>Pexels</a> from <a href='https://pixabay.com//?utm_source=link-attribution&amp;utm_medium=referral&amp;utm_campaign=image&amp;utm_content=2181994'>Pixabay</a>">
+                    <div class="card-body">
+                        <h5 class="card-title">@room.Name</h5>
+                        @if (i % 3 == 0)
+                        {
+                            <p class="card-text">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Consequat interdum varius sit amet mattis vulputate enim nulla.</p>
+                        }
+                        else if (i % 3 == 1)
+                        {
+                            <p class="card-text">In hac habitasse platea dictumst vestibulum rhoncus. Congue eu consequat ac felis donec et odio pellentesque diam. Quam viverra orci sagittis eu. Quis vel eros donec ac odio tempor orci dapibus ultrices.</p>
+                        }
+                        else
+                        {
+                            <p class="card-text">Dignissim convallis aenean et tortor at. Suspendisse potenti nullam ac tortor vitae purus faucibus. Fermentum posuere urna nec tincidunt.</p>
+                        }
+                        <a onclick="" href="/book/@room.Id" class="stretched-link"></a>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <footer class="modal-footer mt-5">
+        Images by <a href="https://pixabay.com/users/pexels-2286921/?utm_source=link-attribution&amp;utm_medium=referral&amp;utm_campaign=image&amp;utm_content=2181994">Pexels</a> from <a href="https://pixabay.com//?utm_source=link-attribution&amp;utm_medium=referral&amp;utm_campaign=image&amp;utm_content=2181994">Pixabay</a>
+    </footer>
+}
+
+@code {
+    private IReadOnlyCollection<Room>? _rooms;
+
+    protected override Task OnInitializedAsync() => FetchRooms();
+
+    private async Task FetchRooms()
+    {
+        using var _ = ActivityScope.Create(nameof(FetchRooms));
+        var catalog = ClusterClient.GetGrain<IRoomCatalogGrain>(0);
+        _rooms = await catalog.GetRooms();
+
+        StateHasChanged();
+    }
+}
