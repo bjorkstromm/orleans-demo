@@ -1,0 +1,139 @@
+@using Blazored.Toast.Services
+<div class="modal @_modalClass"
+     data-bs-backdrop="static"
+     data-bs-keyboard="false"
+     tabindex="-1"
+     aria-labelledby="staticBackdropLabel"
+     aria-hidden="true"
+     style="display:@_modalDisplay">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        @if (TimeSlot is not null)
+        {
+          <h5 class="modal-title" id="staticBackdropLabel">Book @TimeSlot.Date.ToString("yyyy-MM-dd") @TimeSlot.Start - @TimeSlot.End ?</h5>
+        }
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onclick="@CancelReservation"></button>
+      </div>
+      <div class="modal-body">
+        <label for="firstname">Firstname</label>
+        <input type="text" class="form-control" id="firstname"/>
+        <label for="lastname">Lastname</label>
+        <input type="text" class="form-control" id="lastname"/>
+        <label for="email">Email</label>
+        <input type="email" class="form-control" id="email"/>
+        @if (Reservation is not null)
+        {
+          var expiresIn = Math.Max(0, (int)(Reservation.ExpiresOn!.Value - DateTimeOffset.UtcNow).TotalSeconds);
+          <br/>
+          <span>Reservation expires in @(expiresIn) seconds.</span>
+        }
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-danger" type="submit" onclick="@CancelReservation">Cancel</button>
+        <button class="btn btn-primary" type="submit" onclick="@CompleteBooking">Book</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+@if (_showBackdrop)
+{
+    <div class="modal-backdrop fade show"></div>
+}
+
+@code {
+
+  [Parameter, EditorRequired]
+  public TimeSlot? TimeSlot { get; set; }
+
+  [Parameter, EditorRequired]
+  public Reservation? Reservation { get; set; }
+
+  [Parameter, EditorRequired]
+  public IClusterClient ClusterClient { get; set; } = null!;
+
+  [Parameter, EditorRequired]
+  public IToastService ToastService { get; set; } = null!;
+
+  [Parameter, EditorRequired]
+  public Func<Task>? OnClosing { get; set; }
+
+  string _modalDisplay = "none;";
+  string _modalClass = "";
+  bool _showBackdrop = false;
+
+  public void Open()
+  {
+    _modalDisplay = "block;";
+    _modalClass = "Show";
+    _showBackdrop = true;
+
+    StateHasChanged();
+  }
+
+  public async Task Close()
+  {
+    _modalDisplay = "none";
+    _modalClass = "fade";
+    _showBackdrop = false;
+
+    await InvokeAsync(StateHasChanged);
+
+    if (OnClosing is not null)
+    {
+      await OnClosing();
+    }
+  }
+
+
+  private async Task CancelReservation()
+  {
+    if (Reservation is null)
+    {
+      await Close();
+      return;
+    }
+
+    using var _ = ActivityScope.Create(nameof(CancelReservation));
+
+    var timeSlot = ClusterClient.GetGrain<ITimeSlotGrain>(Reservation.TimeSlotId);
+    var success = await timeSlot.CancelReservation(Reservation.ReservationId!);
+
+    if (success)
+    {
+      ToastService.ShowSuccess("Reservation cancelled");
+    }
+    else
+    {
+      ToastService.ShowError("Unable to cancel reservation");
+    }
+
+    await Close();
+  }
+
+  private async Task CompleteBooking()
+  {
+    if (Reservation is null)
+    {
+      await Close();
+      return;
+    }
+
+    using var _ = ActivityScope.Create(nameof(CompleteBooking));
+
+    var timeSlot = ClusterClient.GetGrain<ITimeSlotGrain>(Reservation.TimeSlotId);
+    var success = await timeSlot.Book(Reservation.ReservationId!);
+
+    if (success)
+    {
+      ToastService.ShowSuccess("Booking completed");
+    }
+    else
+    {
+      ToastService.ShowError("Unable to complete booking");
+    }
+
+    await Close();
+  }
+}

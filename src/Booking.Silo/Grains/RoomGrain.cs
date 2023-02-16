@@ -17,18 +17,27 @@ public class RoomGrain : Grain, IRoomGrain
         _observers = new ObserverManager<IRoomObserver>(TimeSpan.FromMinutes(5), logger);
     }
 
-    public Task<IReadOnlyCollection<TimeSlot>> GetTimeSlots(DateOnly date)
+    public Task<IReadOnlyCollection<TimeSlot>> GetTimeSlots(DateOnly from, DateOnly to)
     {
+        if (to < from)
+        {
+            return Task.FromResult<IReadOnlyCollection<TimeSlot>>(Array.Empty<TimeSlot>());
+        }
+
+        var days = to.DayNumber - from.DayNumber + 1;
+
         // Just create some time-slots for the sake of the example.
         // In a real application, this could come from an external service.
         var slots =
-            Enumerable.Range(0, 8)
-                .Select(offset => new TimeSlot(
-                    RoomId: this.GetPrimaryKeyString(),
-                    Date: date,
-                    Start: new TimeOnly(8 + offset, 0),
-                    End: new TimeOnly(9 + offset, 0),
-                    Available: true))
+            Enumerable.Range(0, days)
+                .SelectMany(day =>
+                    Enumerable.Range(0, 8)
+                        .Select(offset => new TimeSlot(
+                            RoomId: this.GetPrimaryKeyString(),
+                            Date: from.AddDays(day),
+                            Start: new TimeOnly(8 + offset, 0),
+                            End: new TimeOnly(9 + offset, 0),
+                            Available: true)))
                 // Set the availability based on the state.
                 .Select(x => x with { Available = !_state.State.NotAvailable.Contains(x.Id) })
                 .ToArray();

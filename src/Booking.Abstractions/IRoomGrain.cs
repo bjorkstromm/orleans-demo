@@ -5,7 +5,7 @@ namespace Booking;
 public interface IRoomGrain : IGrainWithStringKey
 {
     [ReadOnly]
-    Task<IReadOnlyCollection<TimeSlot>> GetTimeSlots(DateOnly date);
+    Task<IReadOnlyCollection<TimeSlot>> GetTimeSlots(DateOnly from, DateOnly to);
 
     Task Subscribe(IRoomObserver observer);
 

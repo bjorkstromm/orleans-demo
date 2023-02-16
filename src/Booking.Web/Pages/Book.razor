@@ -1,16 +1,51 @@
-@page "/book"
+@page "/book/{RoomId}"
 @implements IAsyncDisposable
 @implements IRoomObserver
-@using System.ComponentModel.DataAnnotations
 @using Blazored.Toast.Services
+@using Booking.Components
 @inject IClusterClient ClusterClient
 @inject IToastService ToastService
 
-<PageTitle>Book</PageTitle>
+<PageTitle>Bookerizer 3000 - @_roomName</PageTitle>
 
-<h1>Book</h1>
+<div class="row">
+    <div class="col">
+        <a class="btn btn-primary mt-2" href="/"><span class="oi oi-arrow-thick-left"></span>&nbsp;&nbsp;Back</a>
+    </div>
+    <div class="col">
+        <h1 class="text-md-center">@_roomName</h1>
+    </div>
+    <div class="col"></div>
+</div>
 
-@if (_rooms == null)
+
+<TimeSlotDialog
+    ToastService="ToastService"
+    ClusterClient="ClusterClient"
+    TimeSlot="_timeSlot"
+    Reservation="_reservation"
+    OnClosing="ClearSelected"
+    @ref="_timeSlotDialog" />
+
+<div class="row">
+    <div class="col">
+        <input class="form-control" type="date"
+               @bind="_inputModel.From"
+               @bind:after="FetchTimeSlots"
+               @bind:format="yyyy-MM-dd">
+    </div>
+
+    <div class="col">
+        <input class="form-control" type="date"
+               @bind="_inputModel.To"
+               @bind:after="FetchTimeSlots"
+               @bind:format="yyyy-MM-dd">
+    </div>
+</div>
+
+<hr/>
+
+@if (_timeSlots.Count == 0)
 {
     <p>
         <em>Loading...</em>
@@ -18,72 +53,29 @@
 }
 else
 {
-    <EditForm Model="@_inputModel" OnValidSubmit="@FetchTimeSlots">
-        <DataAnnotationsValidator />
-
-        <div class="row">
-            <div class="col">
-                <select class="form-select"
-                        @bind="_inputModel.RoomId">
-                    @foreach (var room in _rooms)
-                    {
-                        <option value="@room.Id">@room.Name</option>
-                    }
-                </select>
-            </div>
-
-            <div class="col">
-                <input class="form-control" type="date" @bind="_inputModel.Date" @bind:format="yyyy-MM-dd">
-            </div>
-
-            <div class="col">
-                <button class="btn btn-primary" type="submit">Select</button>
-            </div>
-        </div>
-    </EditForm>
-
-    <hr/>
-
-    <table class="table table-striped">
-        <thead>
-        <tr>
-            <th>Date</th>
-            <th>Start</th>
-            <th>Stop</th>
-            <th>Available</th>
-        </tr>
-        </thead>
-        <tbody>
-        @foreach (var timeSlot in _timeSlots)
-        {
-            <tr @onclick="() => Reserve(timeSlot.Id)"
-                class="clickable"
-                style="@(timeSlot.Available ? "" : "background-color: red")">
-                <td>@timeSlot.Date</td>
-                <td>@timeSlot.Start</td>
-                <td>@timeSlot.End</td>
-                <td>@timeSlot.Available</td>
-            </tr>
-        }
-        </tbody>
-    </table>
-
-    <hr/>
-
-    @if (_reservation is not null)
+    @foreach (var dayGroup in _timeSlots.GroupBy(x => x.Date))
     {
-        if (_reservation.Success)
-        {
-            var expiresIn = Math.Max(0, (int)(_reservation.ExpiresOn!.Value - DateTimeOffset.UtcNow).TotalSeconds);
+        <h3 class="mt-5">@dayGroup.Key.ToString("yyyy-MM-dd")</h3>
 
-            <p>Reservation expires in @(expiresIn) seconds.</p>
-            <button class="btn btn-danger" type="submit" onclick="@CancelReservation">Cancel</button>
-            <button class="btn btn-primary" type="submit" onclick="@CompleteBooking">Book</button>
-        }
-        else
-        {
-            <p style="color: red">Reservation failed.</p>
-        }
+        <div class="row row-cols-1 row-cols-md-4 row-cols-sm-2 g-4">
+            @foreach(var timeSlot in dayGroup)
+            {
+                <div class="col">
+                    <div class="card h-100 @(timeSlot.Available ? string.Empty : "text-white bg-danger")">
+                        <div class="card-header">
+                            @timeSlot.Start - @timeSlot.End
+                        </div>
+                        <div class="card-body">
+                            @(timeSlot.Available ? "Available" : "Not available")
+                            <a @onclick="() => Reserve(timeSlot.Id)"
+                               @onclick:preventDefault
+                               href="#"
+                               class="stretched-link"></a>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
     }
 }
 
@@ -91,57 +83,54 @@ else
 
     public class InputModel
     {
-        [Required]
-        public string? RoomId { get; set; }
+        public DateTime From { get; set; } = DateTime.Today;
 
-        public DateTime Date { get; set; } = DateTime.Today;
+        public DateTime To { get; set; } = DateTime.Today.AddDays(7);
     }
 
-    private IReadOnlyCollection<Room>? _rooms;
+    [Parameter]
+    public string RoomId { get; set; } = string.Empty;
+
+    private string? _roomName;
+
     private IReadOnlyCollection<TimeSlot> _timeSlots = Array.Empty<TimeSlot>();
 
     private readonly InputModel _inputModel = new();
     private Reservation? _reservation;
+    private TimeSlotDialog _timeSlotDialog = null!;
+    private TimeSlot? _timeSlot;
     private Timer? _reservationTimer;
-
-    private volatile string? _observedRoomId;
     private Timer? _roomObserverTimer;
+
 
     protected override async Task OnInitializedAsync()
     {
         using var _ = ActivityScope.Create(nameof(OnInitializedAsync));
 
-        _roomObserverTimer = new Timer(ResubscribeToRoom,  null, 0, 5000);
-
-        var catalog = ClusterClient.GetGrain<IRoomCatalogGrain>(0);
-        _rooms = await catalog.GetRooms();
-        _inputModel.RoomId = _rooms.FirstOrDefault()?.Id;
-
+        await SetRoomName();
+        await SubscribeToRoom();
         await FetchTimeSlots();
+
+        _roomObserverTimer = new Timer(ResubscribeToRoom,  null, 5000, 5000);
+    }
+
+    private async Task SetRoomName()
+    {
+        var catalog = ClusterClient.GetGrain<IRoomCatalogGrain>(0);
+        var rooms = await catalog.GetRooms();
+
+        _roomName = rooms.FirstOrDefault(x => string.Equals(x.Id, RoomId, StringComparison.Ordinal))?.Name;
     }
 
     private async Task FetchTimeSlots()
     {
         using var _ = ActivityScope.Create(nameof(FetchTimeSlots));
 
-        var room = ClusterClient.GetGrain<IRoomGrain>(_inputModel.RoomId);
+        var room = ClusterClient.GetGrain<IRoomGrain>(RoomId);
 
-        _timeSlots = await room.GetTimeSlots(DateOnly.FromDateTime(_inputModel.Date));
-
-        // Observe changes to the room.
-        var observer = ClusterClient.CreateObjectReference<IRoomObserver>(this);
-        await room.Subscribe(observer);
-
-        // Remember the observed room.
-        var oldObserverRoomId = _observedRoomId;
-        _observedRoomId = _inputModel.RoomId;
-
-        // Unsubscribe from the previous room.
-        if (oldObserverRoomId is not null && oldObserverRoomId != _inputModel.RoomId)
-        {
-            room = ClusterClient.GetGrain<IRoomGrain>(_observedRoomId);
-            await room.Unsubscribe(observer);
-        }
+        _timeSlots = await room.GetTimeSlots(
+            DateOnly.FromDateTime(_inputModel.From),
+            DateOnly.FromDateTime(_inputModel.To));
     }
 
     private async Task Reserve(string timeSlotId)
@@ -161,56 +150,10 @@ else
 
         _reservation = reservation;
         _reservationTimer = new Timer(TickReservationTimer, null, 0, 1000);
-    }
 
-    private async Task CancelReservation()
-    {
-        using var _ = ActivityScope.Create(nameof(CancelReservation));
+        _timeSlot = TimeSlot.TryParse(timeSlotId, out var ts) ? ts : null;
 
-        if (_reservation is null)
-        {
-            return;
-        }
-
-        var timeSlot = ClusterClient.GetGrain<ITimeSlotGrain>(_reservation.TimeSlotId);
-        var success = await timeSlot.CancelReservation(_reservation.ReservationId!);
-
-        if (success)
-        {
-            ToastService.ShowSuccess("Reservation cancelled");
-        }
-        else
-        {
-            ToastService.ShowError("Unable to cancel reservation");
-        }
-
-        _reservation = null;
-        await ClearSelected();
-    }
-
-    private async Task CompleteBooking()
-    {
-        using var _ = ActivityScope.Create(nameof(CompleteBooking));
-
-        if (_reservation is null)
-        {
-            return;
-        }
-
-        var timeSlot = ClusterClient.GetGrain<ITimeSlotGrain>(_reservation.TimeSlotId);
-        var success = await timeSlot.Book(_reservation.ReservationId!);
-
-        if (success)
-        {
-            ToastService.ShowSuccess("Booking completed");
-        }
-        else
-        {
-            ToastService.ShowError("Unable to complete booking");
-        }
-
-        _reservation = null;
-        await ClearSelected();
+        _timeSlotDialog.Open();
     }
 
     private async Task ClearSelected()
@@ -221,26 +164,28 @@ else
             _reservationTimer = null;
         }
 
-        if (_reservation is not null)
-        {
-            var timeSlot = ClusterClient.GetGrain<ITimeSlotGrain>(_reservation.TimeSlotId);
-            await timeSlot.CancelReservation(_reservation.ReservationId!);
-            _reservation = null;
-        }
+        _reservation = null;
+        _timeSlot = null;
     }
 
-    public async Task OnReservationExpired()
+    private async Task OnReservationExpired()
     {
+
         ToastService.ShowWarning("Reservation expired");
 
         _reservation = null;
         await ClearSelected();
-        await InvokeAsync(StateHasChanged);
+        await InvokeAsync(async () =>
+        {
+            await _timeSlotDialog.Close();
+            StateHasChanged();
+        });
     }
 
     public async Task OnAvailabilityChanged(TimeSlot timeSlot)
     {
-        if (timeSlot.Date != DateOnly.FromDateTime(_inputModel.Date))
+        if (timeSlot.Date < DateOnly.FromDateTime(_inputModel.From)
+            || timeSlot.Date > DateOnly.FromDateTime(_inputModel.To))
         {
             return;
         }
@@ -265,23 +210,18 @@ else
         }
 
         // Stop observing room.
-        if (_observedRoomId is not null)
-        {
-            var room = ClusterClient.GetGrain<IRoomGrain>(_observedRoomId);
-            var observer = ClusterClient.CreateObjectReference<IRoomObserver>(this);
-            await room.Unsubscribe(observer);
-        }
+        var room = ClusterClient.GetGrain<IRoomGrain>(RoomId);
+        var observer = ClusterClient.CreateObjectReference<IRoomObserver>(this);
+        await room.Unsubscribe(observer);
     }
 
-    private async void ResubscribeToRoom(object? _)
+    private async void ResubscribeToRoom(object? _) => await SubscribeToRoom();
+
+    private async Task SubscribeToRoom()
     {
-        // Resubscribe to room periodically, as observers are not persisted.
-        if (_observedRoomId is not null)
-        {
-            var room = ClusterClient.GetGrain<IRoomGrain>(_observedRoomId);
-            var observer = ClusterClient.CreateObjectReference<IRoomObserver>(this);
-            await room.Subscribe(observer);
-        }
+        var room = ClusterClient.GetGrain<IRoomGrain>(RoomId);
+        var observer = ClusterClient.CreateObjectReference<IRoomObserver>(this);
+        await room.Subscribe(observer);
     }
 
     private async void TickReservationTimer(object? _)

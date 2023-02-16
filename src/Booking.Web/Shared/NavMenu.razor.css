@@ -3,8 +3,7 @@
 }
 
 .top-row {
-    height: 3.5rem;
-    background-color: rgba(0,0,0,0.4);
+    height: 200px;
 }
 
 .navbar-brand {
@@ -59,10 +58,21 @@
         /* Never collapse the sidebar for wide screens */
         display: block;
     }
-    
+
     .nav-scrollable {
         /* Allow sidebar to scroll for tall menus */
         height: calc(100vh - 3.5rem);
         overflow-y: auto;
+    }
+}
+
+@media (max-width: 640.98px) {
+    .top-row {
+        height: 100px;
+        background-color: #3d0240;
+        background-image: url('img/bookerizer.png');
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center;
     }
 }

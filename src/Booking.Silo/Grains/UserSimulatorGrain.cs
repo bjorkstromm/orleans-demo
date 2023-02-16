@@ -60,7 +60,7 @@ public class UserSimulatorGrain : Grain, IUserSimulatorGrain, IRemindable
         var date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(Random.Shared.Next(1, 365)));
 
         var roomGrain = _grainFactory.GetGrain<IRoomGrain>(roomId);
-        var timeSlots = await roomGrain.GetTimeSlots(date);
+        var timeSlots = await roomGrain.GetTimeSlots(date, date.AddDays(1));
 
         var availableTimeSlots = timeSlots.Where(x => x.Available).ToArray();
 

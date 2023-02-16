@@ -9,14 +9,18 @@ main {
 }
 
 .sidebar {
-    background-image: linear-gradient(180deg, rgb(5, 39, 103) 0%, #3a0647 70%);
+    background-image: linear-gradient(180deg, #3d0240 50%, #000000 80%);
 }
 
 .top-row {
-    background-color: #f7f7f7;
+    background-color: #3d0240;
+    background-image: url('img/bookerizer.png');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
     border-bottom: 1px solid #d6d5d5;
     justify-content: flex-end;
-    height: 3.5rem;
+    height: 200px;
     display: flex;
     align-items: center;
 }
