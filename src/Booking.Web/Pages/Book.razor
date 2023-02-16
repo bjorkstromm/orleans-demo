@@ -8,16 +8,44 @@
 
 <PageTitle>Bookerizer 3000 - @_roomName</PageTitle>
 
-<h1>@_roomName</h1>
+<div class="row">
+    <div class="col">
+        <a class="btn btn-primary mt-2" href="/"><span class="oi oi-arrow-thick-left"></span>&nbsp;&nbsp;Back</a>
+    </div>
+    <div class="col">
+        <h1 class="text-md-center">@_roomName</h1>
+    </div>
+    <div class="col"></div>
+</div>
+
 
 <TimeSlotDialog
     ToastService="ToastService"
     ClusterClient="ClusterClient"
     TimeSlot="_timeSlot"
     Reservation="_reservation"
+    OnClosing="ClearSelected"
     @ref="_timeSlotDialog" />
 
-@if (_timeSlots == null)
+<div class="row">
+    <div class="col">
+        <input class="form-control" type="date"
+               @bind="_inputModel.From"
+               @bind:after="FetchTimeSlots"
+               @bind:format="yyyy-MM-dd">
+    </div>
+
+    <div class="col">
+        <input class="form-control" type="date"
+               @bind="_inputModel.To"
+               @bind:after="FetchTimeSlots"
+               @bind:format="yyyy-MM-dd">
+    </div>
+</div>
+
+<hr/>
+
+@if (_timeSlots.Count == 0)
 {
     <p>
         <em>Loading...</em>
@@ -25,47 +53,30 @@
 }
 else
 {
-    <div class="row">
-        <div class="col">
-            <input class="form-control" type="date"
-                   @bind="_inputModel.From"
-                   @bind:after="FetchTimeSlots"
-                   @bind:format="yyyy-MM-dd">
+    @foreach (var dayGroup in _timeSlots.GroupBy(x => x.Date))
+    {
+        <h3 class="mt-5">@dayGroup.Key.ToString("yyyy-MM-dd")</h3>
+
+        <div class="row row-cols-1 row-cols-md-4 row-cols-sm-2 g-4">
+            @foreach(var timeSlot in dayGroup)
+            {
+                <div class="col">
+                    <div class="card h-100 @(timeSlot.Available ? string.Empty : "text-white bg-danger")">
+                        <div class="card-header">
+                            @timeSlot.Start - @timeSlot.End
+                        </div>
+                        <div class="card-body">
+                            @(timeSlot.Available ? "Available" : "Not available")
+                            <a @onclick="() => Reserve(timeSlot.Id)"
+                               @onclick:preventDefault
+                               href="#"
+                               class="stretched-link"></a>
+                        </div>
+                    </div>
+                </div>
+            }
         </div>
-
-        <div class="col">
-            <input class="form-control" type="date"
-                   @bind="_inputModel.To"
-                   @bind:after="FetchTimeSlots"
-                   @bind:format="yyyy-MM-dd">
-        </div>
-    </div>
-
-    <hr/>
-
-    <table class="table table-striped">
-        <thead>
-        <tr>
-            <th>Date</th>
-            <th>Start</th>
-            <th>Stop</th>
-            <th>Available</th>
-        </tr>
-        </thead>
-        <tbody>
-        @foreach (var timeSlot in _timeSlots)
-        {
-            <tr @onclick="() => Reserve(timeSlot.Id)"
-                class="clickable"
-                style="@(timeSlot.Available ? "" : "background-color: red")">
-                <td>@timeSlot.Date</td>
-                <td>@timeSlot.Start</td>
-                <td>@timeSlot.End</td>
-                <td>@timeSlot.Available</td>
-            </tr>
-        }
-        </tbody>
-    </table>
+    }
 }
 
 @code {
@@ -74,7 +85,7 @@ else
     {
         public DateTime From { get; set; } = DateTime.Today;
 
-        public DateTime To { get; set; } = DateTime.Today;
+        public DateTime To { get; set; } = DateTime.Today.AddDays(7);
     }
 
     [Parameter]
@@ -86,7 +97,7 @@ else
 
     private readonly InputModel _inputModel = new();
     private Reservation? _reservation;
-    private TimeSlotDialog? _timeSlotDialog;
+    private TimeSlotDialog _timeSlotDialog = null!;
     private TimeSlot? _timeSlot;
     private Timer? _reservationTimer;
     private Timer? _roomObserverTimer;
@@ -126,8 +137,6 @@ else
     {
         using var _ = ActivityScope.Create(nameof(Reserve));
 
-        _timeSlotDialog.Open();
-
         await ClearSelected();
 
         var timeSlot = ClusterClient.GetGrain<ITimeSlotGrain>(timeSlotId);
@@ -141,6 +150,10 @@ else
 
         _reservation = reservation;
         _reservationTimer = new Timer(TickReservationTimer, null, 0, 1000);
+
+        _timeSlot = TimeSlot.TryParse(timeSlotId, out var ts) ? ts : null;
+
+        _timeSlotDialog.Open();
     }
 
     private async Task ClearSelected()
@@ -151,12 +164,8 @@ else
             _reservationTimer = null;
         }
 
-        if (_reservation is not null)
-        {
-            var timeSlot = ClusterClient.GetGrain<ITimeSlotGrain>(_reservation.TimeSlotId);
-            await timeSlot.CancelReservation(_reservation.ReservationId!);
-            _reservation = null;
-        }
+        _reservation = null;
+        _timeSlot = null;
     }
 
     private async Task OnReservationExpired()
@@ -166,9 +175,9 @@ else
 
         _reservation = null;
         await ClearSelected();
-        await InvokeAsync(() =>
+        await InvokeAsync(async () =>
         {
-            _timeSlotDialog.Close();
+            await _timeSlotDialog.Close();
             StateHasChanged();
         });
     }
