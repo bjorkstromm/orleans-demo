@@ -1,14 +1,21 @@
 @page "/book/{RoomId}"
 @implements IAsyncDisposable
 @implements IRoomObserver
-@using System.ComponentModel.DataAnnotations
 @using Blazored.Toast.Services
+@using Booking.Components
 @inject IClusterClient ClusterClient
 @inject IToastService ToastService
 
 <PageTitle>Bookerizer 3000 - @_roomName</PageTitle>
 
 <h1>@_roomName</h1>
+
+<TimeSlotDialog
+    ToastService="ToastService"
+    ClusterClient="ClusterClient"
+    TimeSlot="_timeSlot"
+    Reservation="_reservation"
+    @ref="_timeSlotDialog" />
 
 @if (_timeSlots == null)
 {
@@ -59,31 +66,9 @@ else
         }
         </tbody>
     </table>
-
-    <hr/>
-
-    @if (_reservation is not null)
-    {
-        if (_reservation.Success)
-        {
-            var expiresIn = Math.Max(0, (int)(_reservation.ExpiresOn!.Value - DateTimeOffset.UtcNow).TotalSeconds);
-
-            <p>Reservation expires in @(expiresIn) seconds.</p>
-            <button class="btn btn-danger" type="submit" onclick="@CancelReservation">Cancel</button>
-            <button class="btn btn-primary" type="submit" onclick="@CompleteBooking">Book</button>
-        }
-        else
-        {
-            <p style="color: red">Reservation failed.</p>
-        }
-    }
 }
 
 @code {
-
-    [Parameter]
-    public string RoomId { get; set; } = string.Empty;
-    private string? _roomName;
 
     public class InputModel
     {
@@ -92,13 +77,20 @@ else
         public DateTime To { get; set; } = DateTime.Today;
     }
 
+    [Parameter]
+    public string RoomId { get; set; } = string.Empty;
+
+    private string? _roomName;
+
     private IReadOnlyCollection<TimeSlot> _timeSlots = Array.Empty<TimeSlot>();
 
     private readonly InputModel _inputModel = new();
     private Reservation? _reservation;
+    private TimeSlotDialog? _timeSlotDialog;
+    private TimeSlot? _timeSlot;
     private Timer? _reservationTimer;
-
     private Timer? _roomObserverTimer;
+
 
     protected override async Task OnInitializedAsync()
     {
@@ -134,6 +126,8 @@ else
     {
         using var _ = ActivityScope.Create(nameof(Reserve));
 
+        _timeSlotDialog.Open();
+
         await ClearSelected();
 
         var timeSlot = ClusterClient.GetGrain<ITimeSlotGrain>(timeSlotId);
@@ -147,56 +141,6 @@ else
 
         _reservation = reservation;
         _reservationTimer = new Timer(TickReservationTimer, null, 0, 1000);
-    }
-
-    private async Task CancelReservation()
-    {
-        using var _ = ActivityScope.Create(nameof(CancelReservation));
-
-        if (_reservation is null)
-        {
-            return;
-        }
-
-        var timeSlot = ClusterClient.GetGrain<ITimeSlotGrain>(_reservation.TimeSlotId);
-        var success = await timeSlot.CancelReservation(_reservation.ReservationId!);
-
-        if (success)
-        {
-            ToastService.ShowSuccess("Reservation cancelled");
-        }
-        else
-        {
-            ToastService.ShowError("Unable to cancel reservation");
-        }
-
-        _reservation = null;
-        await ClearSelected();
-    }
-
-    private async Task CompleteBooking()
-    {
-        using var _ = ActivityScope.Create(nameof(CompleteBooking));
-
-        if (_reservation is null)
-        {
-            return;
-        }
-
-        var timeSlot = ClusterClient.GetGrain<ITimeSlotGrain>(_reservation.TimeSlotId);
-        var success = await timeSlot.Book(_reservation.ReservationId!);
-
-        if (success)
-        {
-            ToastService.ShowSuccess("Booking completed");
-        }
-        else
-        {
-            ToastService.ShowError("Unable to complete booking");
-        }
-
-        _reservation = null;
-        await ClearSelected();
     }
 
     private async Task ClearSelected()
@@ -217,11 +161,16 @@ else
 
     private async Task OnReservationExpired()
     {
+
         ToastService.ShowWarning("Reservation expired");
 
         _reservation = null;
         await ClearSelected();
-        await InvokeAsync(StateHasChanged);
+        await InvokeAsync(() =>
+        {
+            _timeSlotDialog.Close();
+            StateHasChanged();
+        });
     }
 
     public async Task OnAvailabilityChanged(TimeSlot timeSlot)
