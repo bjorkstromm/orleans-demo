@@ -1,4 +1,3 @@
-# acr name
 param (
     $acrName,
     $version

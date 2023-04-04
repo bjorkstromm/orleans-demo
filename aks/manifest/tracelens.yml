@@ -1,0 +1,118 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: orleans-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:latest
+        ports:
+        - containerPort: 6379
+          name: redis
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: orleans-demo
+spec:
+  ports:
+  - port: 6379
+  selector:
+    app: redis
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: plantuml
+  namespace: orleans-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: plantuml
+  template:
+    metadata:
+      labels:
+        app: plantuml
+    spec:
+      containers:
+      - name: plantuml
+        image: plantuml/plantuml-server:tomcat
+        ports:
+        - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: plantuml
+  namespace: orleans-demo
+spec:
+  ports:
+  - port: 8080
+  selector:
+    app: plantuml
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tracelens
+  namespace: orleans-demo
+  labels:
+    app: tracelens
+spec:
+  selector:
+    matchLabels:
+      app: tracelens
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: tracelens
+    spec:
+      containers:
+        - name: tracelens
+          image: docker.io/rogeralsing/tracelens:amd64
+          ports:
+          - containerPort: 5001
+          - containerPort: 4317
+          env:
+          - name: PlantUml__RemoteUrl
+            value: http://plantuml.orleans-demo.svc.cluster.local:8080
+          - name: Redis__Server
+            value: redis.orleans-demo.svc.cluster.local
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tracelens
+  namespace: orleans-demo
+spec:
+  type: LoadBalancer
+  ports:
+  - name: http
+    port: 5001
+  selector:
+    app: tracelens
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tracelens-collector
+  namespace: orleans-demo
+spec:
+  ports:
+  - name: grpc
+    port: 4317
+  selector:
+    app: tracelens
