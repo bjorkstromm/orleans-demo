@@ -1,22 +1,22 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: booking-silo
+  name: booking-scaler
   namespace: orleans-demo
   labels:
-    app: booking-silo
+    app: booking-scaler
 spec:
   selector:
     matchLabels:
-      app: booking-silo
-  replicas: 2
+      app: booking-scaler
+  replicas: 1
   template:
     metadata:
       labels:
-        app: booking-silo
+        app: booking-scaler
 
         # The serviceId label is used to identify the service to Orleans
-        orleans/serviceId: booking-silo
+        orleans/serviceId: booking-scaler
 
         # The clusterId label is used to identify an instance of a cluster to Orleans.
         # Typically, this will be the same value as serviceId or any fixed value.
@@ -31,7 +31,7 @@ spec:
       serviceAccountName: orleans-demo-sa
       containers:
         - name: main
-          image: mbaksacr.azurecr.io/booking.silo:dev
+          image: mbaksacr.azurecr.io/booking.scaler:dev
           imagePullPolicy: Always
           ports:
           - containerPort: 11111
@@ -84,35 +84,17 @@ spec:
     rollingUpdate:
       maxUnavailable: 0
       maxSurge: 1
----
-apiVersion: keda.sh/v1alpha1 
-kind: ScaledObject
-metadata:
-  name: booking-scaler
-  namespace: orleans-demo
-spec:
-  scaleTargetRef:
-    name: booking-silo
-  minReplicaCount: 1
-  maxReplicaCount: 10
-  cooldownPeriod: 5
-  triggers:
-  - type: external
-    metadata:
-      scalerAddress: booking-scaler.orleans-demo.svc.cluster.local:80
-      graintype: 'timeslot'
-      upperbound: '300'
+
 ---
 # In order to be able to access the service from outside the cluster, we will need to add a Service object
 apiVersion: v1
 kind: Service
 metadata:
-  name: booking-silo
+  name: booking-scaler
   namespace: orleans-demo
 spec:
-  type: LoadBalancer
   ports:
-  - name: http
+  - name: grpc
     port: 80
   selector:
-    app: booking-silo
+    app: booking-scaler
