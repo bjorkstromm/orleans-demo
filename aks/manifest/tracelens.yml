@@ -95,19 +95,6 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: tracelens
-  namespace: orleans-demo
-spec:
-  type: LoadBalancer
-  ports:
-  - name: http
-    port: 5001
-  selector:
-    app: tracelens
----
-apiVersion: v1
-kind: Service
-metadata:
   name: tracelens-collector
   namespace: orleans-demo
 spec:
@@ -116,3 +103,42 @@ spec:
     port: 4317
   selector:
     app: tracelens
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tracelens-ui
+  namespace: orleans-demo
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5001
+  selector:
+    app: tracelens
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tracelens-ui-ingress
+  namespace: orleans-demo
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    cert-manager.io/cluster-issuer: letsencrypt
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - trace.bookerizer.aks.bjorkstrom.dev
+    secretName: tracelens-ui-tls-secret
+  rules:
+  - host: trace.bookerizer.aks.bjorkstrom.dev
+    http:
+      paths:
+      - path: /(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: tracelens-ui
+            port:
+              number: 5001

@@ -103,16 +103,41 @@ spec:
       graintype: 'timeslot'
       upperbound: '300'
 ---
-# In order to be able to access the service from outside the cluster, we will need to add a Service object
 apiVersion: v1
 kind: Service
 metadata:
   name: booking-silo
   namespace: orleans-demo
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   ports:
-  - name: http
-    port: 80
+  - port: 80
   selector:
     app: booking-silo
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: booking-silo-ingress
+  namespace: orleans-demo
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    cert-manager.io/cluster-issuer: letsencrypt
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - silo.bookerizer.aks.bjorkstrom.dev
+    secretName: booking-silo-tls-secret
+  rules:
+  - host: silo.bookerizer.aks.bjorkstrom.dev
+    http:
+      paths:
+      - path: /(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: booking-silo
+            port:
+              number: 80
