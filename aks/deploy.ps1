@@ -29,7 +29,7 @@ kubectl apply -f .\namespace.yml
 $ExecutionContext.InvokeCommand.ExpandString((Get-Content .\service-account.yml | Out-String)) | kubectl apply -f -
 kubectl apply -f .\pod-reader-role.yml
 $ExecutionContext.InvokeCommand.ExpandString((Get-Content .\booking-config.yml | Out-String)) | kubectl apply -f -
-kubectl apply -f .\tracelens.yml
+$ExecutionContext.InvokeCommand.ExpandString((Get-Content .\tracelens.yml  | Out-String)) | kubectl apply -f -
 $ExecutionContext.InvokeCommand.ExpandString((Get-Content .\booking-scaler.yml | Out-String)) | kubectl apply -f -
 $ExecutionContext.InvokeCommand.ExpandString((Get-Content .\booking-silo.yml | Out-String)) | kubectl apply -f -
 $ExecutionContext.InvokeCommand.ExpandString((Get-Content .\booking-web.yml | Out-String)) | kubectl apply -f -

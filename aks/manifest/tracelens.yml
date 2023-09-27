@@ -82,7 +82,7 @@ spec:
     spec:
       containers:
         - name: tracelens
-          image: docker.io/rogeralsing/tracelens:amd64
+          image: mbaksacr.azurecr.io/tracelens:$BOOKERIZER_VERSION
           ports:
           - containerPort: 5001
           - containerPort: 4317

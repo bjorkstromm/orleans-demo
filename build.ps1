@@ -15,6 +15,9 @@ docker build -t "$acrName.azurecr.io/booking.admin:$version" -f ./src/Booking.Ad
 # Build scaler
 docker build -t "$acrName.azurecr.io/booking.scaler:$version" -f ./src/Booking.Scaler/Dockerfile .
 
+# Build Tracelens
+docker build -t "$acrName.azurecr.io/tracelens:$version" -f ./src/Tracelens/Dockerfile .
+
 # ACR login
 az acr login --name $acrName
 
@@ -23,6 +26,7 @@ docker push "$acrName.azurecr.io/booking.silo:$version"
 docker push "$acrName.azurecr.io/booking.web:$version"
 docker push "$acrName.azurecr.io/booking.admin:$version"
 docker push "$acrName.azurecr.io/booking.scaler:$version"
+docker push "$acrName.azurecr.io/tracelens:$version"
 
 # ACR logout
 docker logout "$acrName.azurecr.io"
