@@ -31,8 +31,7 @@ spec:
       serviceAccountName: orleans-demo-sa
       containers:
         - name: main
-          image: mbaksacr.azurecr.io/booking.silo:dev
-          imagePullPolicy: Always
+          image: mbaksacr.azurecr.io/booking.silo:$BOOKERIZER_VERSION
           ports:
           - containerPort: 11111
           - containerPort: 30000

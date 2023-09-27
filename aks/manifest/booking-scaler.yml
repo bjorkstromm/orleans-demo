@@ -31,8 +31,7 @@ spec:
       serviceAccountName: orleans-demo-sa
       containers:
         - name: main
-          image: mbaksacr.azurecr.io/booking.scaler:dev
-          imagePullPolicy: Always
+          image: mbaksacr.azurecr.io/booking.scaler:$BOOKERIZER_VERSION
           ports:
           - containerPort: 11111
           - containerPort: 30000
