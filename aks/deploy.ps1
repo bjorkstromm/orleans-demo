@@ -34,5 +34,6 @@ $ExecutionContext.InvokeCommand.ExpandString((Get-Content .\booking-scaler.yml |
 $ExecutionContext.InvokeCommand.ExpandString((Get-Content .\booking-silo.yml | Out-String)) | kubectl apply -f -
 $ExecutionContext.InvokeCommand.ExpandString((Get-Content .\booking-web.yml | Out-String)) | kubectl apply -f -
 $ExecutionContext.InvokeCommand.ExpandString((Get-Content .\booking-admin.yml | Out-String)) | kubectl apply -f -
+kubectl apply -f .\ingress.yml
 
 Pop-Location
