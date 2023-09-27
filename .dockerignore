@@ -21,7 +21,10 @@
 **/obj
 **/secrets.dev.yaml
 **/values.dev.yaml
-infra/*.*
+aca/*.*
 aks/*.*
+.config/*.*
+.idea/*.*
+media/*.*
 LICENSE
 README.md
