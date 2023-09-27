@@ -15,6 +15,6 @@ $appId = $(az ad sp list --filter "displayname eq 'Orleans Booking Demo Admin'" 
 # Deploy
 az deployment group create `
     --resource-group $resourceGroup `
-    --template-file infra/app.bicep `
+    --template-file app.bicep `
     --parameters "version=$version" `
                  "aadClientId=$appId"
