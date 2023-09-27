@@ -1,8 +1,8 @@
-﻿FROM mcr.microsoft.com/dotnet/aspnet:7.0 AS base
+﻿FROM mcr.microsoft.com/dotnet/aspnet:7.0.11 AS base
 WORKDIR /app
 EXPOSE 80
 
-FROM mcr.microsoft.com/dotnet/sdk:7.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:7.0.401 AS build
 WORKDIR /src
 COPY ["src/Booking.Admin/Booking.Admin.csproj", "src/Booking.Admin/"]
 RUN dotnet restore "src/Booking.Admin/Booking.Admin.csproj"

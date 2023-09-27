@@ -40,7 +40,7 @@ public class UserSimulatorGrain : Grain, IUserSimulatorGrain, IRemindable
             TimeSpan.Zero,
             TimeSpan.FromMinutes(1));
 
-        _timer = RegisterTimer(OnTick, null, TimeSpan.FromSeconds(Random.Shared.Next(10)), TimeSpan.FromSeconds(5));
+        _timer = RegisterTimer(OnTick, string.Empty, TimeSpan.FromSeconds(Random.Shared.Next(10)), TimeSpan.FromSeconds(5));
     }
 
     private async Task OnTick(object? state)
@@ -84,7 +84,7 @@ public class UserSimulatorGrain : Grain, IUserSimulatorGrain, IRemindable
         // Wake up timer if it's not running
         if (_state.State.Count < 100 && _timer is null)
         {
-            _timer = RegisterTimer(OnTick, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5));
+            _timer = RegisterTimer(OnTick, string.Empty, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5));
         }
         else if (_state.State.Count >= 100) // End after 100 iterations
         {

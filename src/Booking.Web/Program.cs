@@ -74,8 +74,7 @@ builder.Services.AddOpenTelemetry()
         .AddSource("Microsoft.Orleans.Runtime")
         .AddSource("Microsoft.Orleans.Application")
         .AddSource("Booking")
-        .AddOtlpExporter())
-    .StartWithHost();
+        .AddOtlpExporter());
 
 var app = builder.Build();
 
