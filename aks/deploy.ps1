@@ -24,6 +24,9 @@ Push-Location "$PSScriptRoot/manifest/"
 $APPLICATIONINSIGHTS_CONNECTION_STRING = $(az resource show -g $resourceGroup -n mb-aks-ai --resource-type "microsoft.insights/components" --query properties.ConnectionString -o tsv)
 $AZURE_STORAGE_NAME = "mbakssa"
 $MANAGEDIDENTITY_CLIENTID = $(az identity show -g $resourceGroup -n orleans-workload-identity --query clientId -o tsv)
+$AAD_CLIENTID = $(az ad sp list --filter "displayname eq 'Orleans Booking Demo Admin'" --query "[0].appId" -o tsv)
+$AAD_TENANTID = $(az ad sp list --filter "displayname eq 'Orleans Booking Demo Admin'" --query "[0].appOwnerOrganizationId" -o tsv)
+$AAD_DOMAIN = $(az rest --method get --url 'https://graph.microsoft.com/v1.0/domains?$select=id' --query "value[0].id" -o tsv)
 
 kubectl apply -f .\namespace.yml
 $ExecutionContext.InvokeCommand.ExpandString((Get-Content .\service-account.yml | Out-String)) | kubectl apply -f -

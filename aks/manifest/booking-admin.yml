@@ -77,6 +77,21 @@ spec:
                 key: MANAGEDIDENTITY_CLIENTID
           - name: OTEL_EXPORTER_OTLP_ENDPOINT
             value: http://tracelens-collector.orleans-demo.svc.cluster.local:4317
+          - name: AzureAd__TenantId
+            valueFrom:
+              configMapKeyRef:
+                name: booking-config
+                key: AAD_TENANTID
+          - name: AzureAd__Domain
+            valueFrom:
+              configMapKeyRef:
+                name: booking-config
+                key: AAD_DOMAIN
+          - name: AzureAd__ClientId
+            valueFrom:
+              configMapKeyRef:
+                name: booking-config
+                key: AAD_CLIENTID
       terminationGracePeriodSeconds: 180
   minReadySeconds: 60
   strategy:
