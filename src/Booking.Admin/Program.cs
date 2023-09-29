@@ -1,6 +1,7 @@
 using Azure.Identity;
 using Azure.Monitor.OpenTelemetry.Exporter;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Identity.Web;
 using Microsoft.Identity.Web.UI;
@@ -92,12 +93,28 @@ builder.Services.AddOpenTelemetry()
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
-    options.ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost;
+    options.ForwardedHeaders =
+        ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+});
+
+builder.Services.AddHttpLogging(options =>
+{
+    options.LoggingFields = HttpLoggingFields.RequestPropertiesAndHeaders;
 });
 
 var app = builder.Build();
 
 app.UseForwardedHeaders();
+app.UseHttpLogging();
+
+app.Use(async (context, next) =>
+{
+    // Connection: RemoteIp
+    app.Logger.LogInformation("Request RemoteIp: {RemoteIpAddress}",
+        context.Connection.RemoteIpAddress);
+
+    await next(context);
+});
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

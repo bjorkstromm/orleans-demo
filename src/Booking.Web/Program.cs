@@ -77,14 +77,7 @@ builder.Services.AddOpenTelemetry()
         .AddSource("Booking")
         .AddOtlpExporter());
 
-builder.Services.Configure<ForwardedHeadersOptions>(options =>
-{
-    options.ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost;
-});
-
 var app = builder.Build();
-
-app.UseForwardedHeaders();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
