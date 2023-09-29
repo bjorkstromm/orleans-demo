@@ -36,6 +36,16 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2021-04-01' = {
   }
 }
 
+resource storageAccountBlobServices 'Microsoft.Storage/storageAccounts/blobServices@2023-01-01' = {
+  parent: storageAccount
+  name: 'default'
+}
+
+resource dataprotectionContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-01-01' = {
+  parent: storageAccountBlobServices
+  name: 'dataprotection'
+}
+
 resource keyVault 'Microsoft.KeyVault/vaults@2023-02-01' = {
   name: '${shortName}kv'
   location: location
@@ -46,6 +56,15 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-02-01' = {
     }
     tenantId: subscription().tenantId
     enableRbacAuthorization: true
+  }
+}
+
+resource dataprotection 'Microsoft.KeyVault/vaults/keys@2023-02-01' = {
+  parent: keyVault
+  name: 'dataprotection'
+  properties: {
+    keySize: 2048
+    kty: 'RSA'
   }
 }
 
