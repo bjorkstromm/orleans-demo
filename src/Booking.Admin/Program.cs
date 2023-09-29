@@ -1,3 +1,4 @@
+using System.Net;
 using Azure.Identity;
 using Azure.Monitor.OpenTelemetry.Exporter;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
@@ -93,8 +94,8 @@ builder.Services.AddOpenTelemetry()
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
-    options.ForwardedHeaders =
-        ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Add(new IPNetwork(IPAddress.Parse("10.224.0.0"), 16));
 });
 
 builder.Services.AddHttpLogging(options =>
