@@ -2,9 +2,7 @@ using System.Net;
 using Azure.Identity;
 using Azure.Monitor.OpenTelemetry.Exporter;
 using Blazored.Toast;
-using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.AspNetCore.HttpOverrides;
-using OpenTelemetry;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -85,24 +83,9 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.KnownNetworks.Add(new IPNetwork(IPAddress.Parse("10.224.0.0"), 16));
 });
 
-builder.Services.AddHttpLogging(options =>
-{
-    options.LoggingFields = HttpLoggingFields.RequestPropertiesAndHeaders;
-});
-
 var app = builder.Build();
 
 app.UseForwardedHeaders();
-app.UseHttpLogging();
-
-app.Use(async (context, next) =>
-{
-    // Connection: RemoteIp
-    app.Logger.LogInformation("Request RemoteIp: {RemoteIpAddress}",
-        context.Connection.RemoteIpAddress);
-
-    await next(context);
-});
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
