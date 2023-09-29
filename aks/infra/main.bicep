@@ -4,6 +4,7 @@ var name = 'mb-aks'
 var shortName = replace(name, '-', '')
 var storageTableContributorRbacResourceId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3')
 var storageBlobContributorRbacResourceId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
+var keyVaultCryptoServiceEncryptionUserRbacResourceId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'e147488a-f6f5-4113-8e2d-b22465e65bf6')
 
 resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10-01' = {
   name: '${name}-logs'
@@ -35,6 +36,19 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2021-04-01' = {
   }
 }
 
+resource keyVault 'Microsoft.KeyVault/vaults@2023-02-01' = {
+  name: '${shortName}kv'
+  location: location
+  properties: {
+    sku: {
+      name: 'standard'
+      family: 'A'
+    }
+    tenantId: subscription().tenantId
+    enableRbacAuthorization: true
+  }
+}
+
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2021-09-01' = {
   name: '${shortName}acr'
   location: location
@@ -62,6 +76,15 @@ resource rbacStorageBlobContributor 'Microsoft.Authorization/roleAssignments@202
   name: guid(storageAccount.id, managedIdentity.id, storageBlobContributorRbacResourceId)
   properties: {
     roleDefinitionId: storageBlobContributorRbacResourceId
+    principalId: managedIdentity.properties.principalId
+  }
+}
+
+resource keyVaultCryptoServiceEncryptionUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: keyVault
+  name: guid(keyVault.id, managedIdentity.id, keyVaultCryptoServiceEncryptionUserRbacResourceId)
+  properties: {
+    roleDefinitionId: keyVaultCryptoServiceEncryptionUserRbacResourceId
     principalId: managedIdentity.properties.principalId
   }
 }

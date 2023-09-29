@@ -70,6 +70,11 @@ spec:
               configMapKeyRef:
                 name: booking-config
                 key: AZURE_STORAGE_NAME
+          - name: AZURE_KEYVAULT_NAME
+            valueFrom:
+              configMapKeyRef:
+                name: booking-config
+                key: AZURE_KEYVAULT_NAME
           - name: MANAGEDIDENTITY_CLIENTID
             valueFrom:
               configMapKeyRef:

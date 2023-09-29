@@ -66,7 +66,15 @@ public class UserSimulatorGrain : Grain, IUserSimulatorGrain, IRemindable
         }
 
         var timeSlotGrain = _grainFactory.GetGrain<ITimeSlotGrain>(RandomTimeSlot().Id);
-        await timeSlotGrain.Reserve();
+        var reservation = await timeSlotGrain.Reserve();
+
+        if (!reservation.Success)
+        {
+            return;
+        }
+
+        await Task.Delay(TimeSpan.FromSeconds(Random.Shared.Next(5)));
+        await timeSlotGrain.CancelReservation(reservation.ReservationId!);
 
         _state.State.Count++;
     }

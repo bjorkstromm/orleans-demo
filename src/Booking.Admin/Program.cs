@@ -2,6 +2,7 @@ using System.Net;
 using Azure.Identity;
 using Azure.Monitor.OpenTelemetry.Exporter;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Identity.Web;
 using Microsoft.Identity.Web.UI;
@@ -11,11 +12,11 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
+var managedIdentityClientId = builder.Configuration.GetValue<string>("MANAGEDIDENTITY_CLIENTID");
 
 builder.Host.UseOrleansClient(clientBuilder =>
 {
     var storageName = builder.Configuration.GetValue<string>("AZURE_STORAGE_NAME");
-    var managedIdentityClientId = builder.Configuration.GetValue<string>("MANAGEDIDENTITY_CLIENTID");
     var connectionString = builder.Configuration.GetValue<string>("AzureWebJobsStorage");
     var useManagedIdentity = !string.IsNullOrWhiteSpace(storageName) && !string.IsNullOrWhiteSpace(managedIdentityClientId);
 
@@ -40,7 +41,6 @@ builder.Host.UseOrleansClient(clientBuilder =>
 });
 
 // Add services to the container.
-
 builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
     .AddMicrosoftIdentityWebApp(builder.Configuration.GetSection("AzureAd"));
 builder.Services.AddControllersWithViews()
@@ -55,6 +55,19 @@ builder.Services.AddApplicationInsightsTelemetry();
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor()
     .AddMicrosoftIdentityConsentHandler();
+
+var keyVaultName = builder.Configuration.GetValue<string>("AZURE_KEYVAULT_NAME");
+if (!string.IsNullOrEmpty(keyVaultName) && !string.IsNullOrEmpty(managedIdentityClientId))
+{
+    builder.Services
+        .AddDataProtection()
+        .ProtectKeysWithAzureKeyVault(
+            new Uri($"https://{keyVaultName}.vault.azure.net/keys/dataprotection"),
+            new DefaultAzureCredential(new DefaultAzureCredentialOptions
+            {
+                ManagedIdentityClientId = managedIdentityClientId
+            }));
+}
 
 var applicationInsightsConnectionString = builder.Configuration.GetValue<string>("APPLICATIONINSIGHTS_CONNECTION_STRING");
 
