@@ -40,9 +40,6 @@ resource scalerContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
       '${managedIdentity.id}': {}
     }
   }
-  dependsOn: [
-    redisContainerApp
-  ]
   properties: {
     managedEnvironmentId: containerAppEnvironment.id
     configuration: {
@@ -80,20 +77,10 @@ resource scalerContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
             }
             {
               name: 'OTEL_EXPORTER_OTLP_ENDPOINT'
-              value: 'http://localhost:4317'
+              value: 'http://jaeger:4317'
             }
           ]
         }
-        // {
-        //   image: 'docker.io/rogeralsing/tracelens:amd64'
-        //   name: 'tracelens-collector'
-        //   env: [
-        //     {
-        //       name: 'Redis__Server'
-        //       value: 'redis'
-        //     }
-        //   ]
-        // }
       ]
       scale: {
         minReplicas: 1
@@ -113,9 +100,6 @@ resource siloContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
       '${managedIdentity.id}': {}
     }
   }
-  dependsOn: [
-    redisContainerApp
-  ]
   properties: {
     managedEnvironmentId: containerAppEnvironment.id
     configuration: {
@@ -152,20 +136,10 @@ resource siloContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
             }
             {
               name: 'OTEL_EXPORTER_OTLP_ENDPOINT'
-              value: 'http://localhost:4317'
+              value: 'http://jaeger:4317'
             }
           ]
         }
-        // {
-        //   image: 'docker.io/rogeralsing/tracelens:amd64'
-        //   name: 'tracelens-collector'
-        //   env: [
-        //     {
-        //       name: 'Redis__Server'
-        //       value: 'redis'
-        //     }
-        //   ]
-        // }
       ]
       scale: {
         minReplicas: 1
@@ -198,9 +172,6 @@ resource webContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
       '${managedIdentity.id}': {}
     }
   }
-  dependsOn: [
-    redisContainerApp
-  ]
   properties: {
     managedEnvironmentId: containerAppEnvironment.id
     configuration: {
@@ -237,20 +208,10 @@ resource webContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
             }
             {
               name: 'OTEL_EXPORTER_OTLP_ENDPOINT'
-              value: 'http://localhost:4317'
+              value: 'http://jaeger:4317'
             }
           ]
         }
-        // {
-        //   image: 'docker.io/rogeralsing/tracelens:amd64'
-        //   name: 'tracelens-collector'
-        //   env: [
-        //     {
-        //       name: 'Redis__Server'
-        //       value: 'redis'
-        //     }
-        //   ]
-        // }
       ]
       scale: {
         minReplicas: 1
@@ -270,9 +231,6 @@ resource adminContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
       '${managedIdentity.id}': {}
     }
   }
-  dependsOn: [
-    redisContainerApp
-  ]
   properties: {
     managedEnvironmentId: containerAppEnvironment.id
     configuration: {
@@ -313,7 +271,7 @@ resource adminContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
             }
             {
               name: 'OTEL_EXPORTER_OTLP_ENDPOINT'
-              value: 'http://localhost:4317'
+              value: 'http://jaeger:4317'
             }
             {
               name: 'AzureAd__TenantId'
@@ -329,16 +287,41 @@ resource adminContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
             }
           ]
         }
-        // {
-        //   image: 'docker.io/rogeralsing/tracelens:amd64'
-        //   name: 'tracelens-collector'
-        //   env: [
-        //     {
-        //       name: 'Redis__Server'
-        //       value: 'redis'
-        //     }
-        //   ]
-        // }
+      ]
+      scale: {
+        minReplicas: 1
+        maxReplicas: 1
+      }
+    }
+  }
+}
+
+// Jaeger
+resource jaegerContainerApp 'Microsoft.App/containerApps@2023-05-02-preview' = {
+  name: 'jaeger'
+  location: location
+  properties: {
+    managedEnvironmentId: containerAppEnvironment.id
+    configuration: {
+      activeRevisionsMode: 'Single'
+      ingress: {
+        additionalPortMappings: [
+          {
+            external: false
+            targetPort: 4317
+          }
+        ]
+        external: true
+        targetPort: 16686
+        transport: 'auto'
+      }
+    }
+    template: {
+      containers: [
+        {
+          image: 'jaegertracing/all-in-one:1.49'
+          name: 'jaeger'
+        }
       ]
       scale: {
         minReplicas: 1

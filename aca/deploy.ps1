@@ -32,3 +32,5 @@ az deployment group create `
     --parameters "version=$version" `
                  "aadClientId=$appId" `
                  "aadDomain=$domain"
+
+Pop-Location
