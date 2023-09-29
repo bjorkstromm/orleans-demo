@@ -12,11 +12,12 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var storageName = builder.Configuration.GetValue<string>("AZURE_STORAGE_NAME");
 var managedIdentityClientId = builder.Configuration.GetValue<string>("MANAGEDIDENTITY_CLIENTID");
 
 builder.Host.UseOrleansClient(clientBuilder =>
 {
-    var storageName = builder.Configuration.GetValue<string>("AZURE_STORAGE_NAME");
     var connectionString = builder.Configuration.GetValue<string>("AzureWebJobsStorage");
     var useManagedIdentity = !string.IsNullOrWhiteSpace(storageName) && !string.IsNullOrWhiteSpace(managedIdentityClientId);
 
@@ -57,16 +58,23 @@ builder.Services.AddServerSideBlazor()
     .AddMicrosoftIdentityConsentHandler();
 
 var keyVaultName = builder.Configuration.GetValue<string>("AZURE_KEYVAULT_NAME");
-if (!string.IsNullOrEmpty(keyVaultName) && !string.IsNullOrEmpty(managedIdentityClientId))
+if (!string.IsNullOrEmpty(keyVaultName)
+    && !string.IsNullOrEmpty(storageName)
+    && !string.IsNullOrEmpty(managedIdentityClientId))
 {
+    var credential = new DefaultAzureCredential(new DefaultAzureCredentialOptions
+    {
+        ManagedIdentityClientId = managedIdentityClientId
+    });
+
     builder.Services
         .AddDataProtection()
+        .PersistKeysToAzureBlobStorage(
+            new Uri($"https://{storageName}.blob.core.windows.net/dataprotection/dataprotection"),
+            credential)
         .ProtectKeysWithAzureKeyVault(
             new Uri($"https://{keyVaultName}.vault.azure.net/keys/dataprotection"),
-            new DefaultAzureCredential(new DefaultAzureCredentialOptions
-            {
-                ManagedIdentityClientId = managedIdentityClientId
-            }));
+            credential);
 }
 
 var applicationInsightsConnectionString = builder.Configuration.GetValue<string>("APPLICATIONINSIGHTS_CONNECTION_STRING");
