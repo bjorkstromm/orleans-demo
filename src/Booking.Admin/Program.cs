@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using Azure.Identity;
 using Azure.Monitor.OpenTelemetry.Exporter;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
@@ -113,6 +114,12 @@ app.Use(async (context, next) =>
     // Connection: RemoteIp
     app.Logger.LogInformation("Request RemoteIp: {RemoteIpAddress}",
         context.Connection.RemoteIpAddress);
+    var sb = new StringBuilder();
+    foreach (var header in context.Request.Headers)
+    {
+        sb.AppendLine($"Request Header: {header.Key}={header.Value}");
+    }
+    app.Logger.LogInformation(sb.ToString());
 
     await next(context);
 });
