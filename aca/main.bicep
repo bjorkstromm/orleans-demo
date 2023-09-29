@@ -5,6 +5,7 @@ var shortName = replace(name, '-', '')
 var acrPullRbacResourceId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
 var storageTableContributorRbacResourceId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3')
 var storageBlobContributorRbacResourceId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
+var keyVaultCryptoServiceEncryptionUserRbacResourceId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'e147488a-f6f5-4113-8e2d-b22465e65bf6')
 
 resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10-01' = {
   name: '${name}-logs'
@@ -33,6 +34,38 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2021-04-01' = {
   kind: 'StorageV2'
   sku: {
     name: 'Standard_LRS'
+  }
+}
+
+resource storageAccountBlobServices 'Microsoft.Storage/storageAccounts/blobServices@2023-01-01' = {
+  parent: storageAccount
+  name: 'default'
+}
+
+resource dataprotectionContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-01-01' = {
+  parent: storageAccountBlobServices
+  name: 'dataprotection'
+}
+
+resource keyVault 'Microsoft.KeyVault/vaults@2023-02-01' = {
+  name: '${shortName}kv'
+  location: location
+  properties: {
+    sku: {
+      name: 'standard'
+      family: 'A'
+    }
+    tenantId: subscription().tenantId
+    enableRbacAuthorization: true
+  }
+}
+
+resource dataprotection 'Microsoft.KeyVault/vaults/keys@2023-02-01' = {
+  parent: keyVault
+  name: 'dataprotection'
+  properties: {
+    keySize: 2048
+    kty: 'RSA'
   }
 }
 
@@ -72,6 +105,15 @@ resource rbacStorageBlobContributor 'Microsoft.Authorization/roleAssignments@202
   name: guid(storageAccount.id, managedIdentity.id, storageBlobContributorRbacResourceId)
   properties: {
     roleDefinitionId: storageBlobContributorRbacResourceId
+    principalId: managedIdentity.properties.principalId
+  }
+}
+
+resource keyVaultCryptoServiceEncryptionUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: keyVault
+  name: guid(keyVault.id, managedIdentity.id, keyVaultCryptoServiceEncryptionUserRbacResourceId)
+  properties: {
+    roleDefinitionId: keyVaultCryptoServiceEncryptionUserRbacResourceId
     principalId: managedIdentity.properties.principalId
   }
 }

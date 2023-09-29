@@ -1,5 +1,6 @@
 param version string
 param aadClientId string
+param aadDomain string
 param location string = resourceGroup().location
 
 var name = 'mb-orleans-demo'
@@ -15,6 +16,10 @@ resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2022-03-01' 
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2021-04-01' existing = {
   name: '${shortName}sa'
+}
+
+resource keyVault 'Microsoft.KeyVault/vaults@2023-02-01' existing = {
+  name: '${shortName}kv'
 }
 
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2021-09-01' existing = {
@@ -79,16 +84,16 @@ resource scalerContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
             }
           ]
         }
-        {
-          image: 'docker.io/rogeralsing/tracelens:amd64'
-          name: 'tracelens-collector'
-          env: [
-            {
-              name: 'Redis__Server'
-              value: 'redis'
-            }
-          ]
-        }
+        // {
+        //   image: 'docker.io/rogeralsing/tracelens:amd64'
+        //   name: 'tracelens-collector'
+        //   env: [
+        //     {
+        //       name: 'Redis__Server'
+        //       value: 'redis'
+        //     }
+        //   ]
+        // }
       ]
       scale: {
         minReplicas: 1
@@ -151,16 +156,16 @@ resource siloContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
             }
           ]
         }
-        {
-          image: 'docker.io/rogeralsing/tracelens:amd64'
-          name: 'tracelens-collector'
-          env: [
-            {
-              name: 'Redis__Server'
-              value: 'redis'
-            }
-          ]
-        }
+        // {
+        //   image: 'docker.io/rogeralsing/tracelens:amd64'
+        //   name: 'tracelens-collector'
+        //   env: [
+        //     {
+        //       name: 'Redis__Server'
+        //       value: 'redis'
+        //     }
+        //   ]
+        // }
       ]
       scale: {
         minReplicas: 1
@@ -236,16 +241,16 @@ resource webContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
             }
           ]
         }
-        {
-          image: 'docker.io/rogeralsing/tracelens:amd64'
-          name: 'tracelens-collector'
-          env: [
-            {
-              name: 'Redis__Server'
-              value: 'redis'
-            }
-          ]
-        }
+        // {
+        //   image: 'docker.io/rogeralsing/tracelens:amd64'
+        //   name: 'tracelens-collector'
+        //   env: [
+        //     {
+        //       name: 'Redis__Server'
+        //       value: 'redis'
+        //     }
+        //   ]
+        // }
       ]
       scale: {
         minReplicas: 1
@@ -299,6 +304,10 @@ resource adminContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
               value: storageAccount.name
             }
             {
+              name: 'AZURE_KEYVAULT_NAME'
+              value: keyVault.name
+            }
+            {
               name: 'MANAGEDIDENTITY_CLIENTID'
               value: managedIdentity.properties.clientId
             }
@@ -306,48 +315,34 @@ resource adminContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
               name: 'OTEL_EXPORTER_OTLP_ENDPOINT'
               value: 'http://localhost:4317'
             }
-          ]
-        }
-        {
-          image: 'docker.io/rogeralsing/tracelens:amd64'
-          name: 'tracelens-collector'
-          env: [
             {
-              name: 'Redis__Server'
-              value: 'redis'
+              name: 'AzureAd__TenantId'
+              value: subscription().tenantId
+            }
+            {
+              name: 'AzureAd__Domain'
+              value: aadDomain
+            }
+            {
+              name: 'AzureAd__ClientId'
+              value: aadClientId
             }
           ]
         }
+        // {
+        //   image: 'docker.io/rogeralsing/tracelens:amd64'
+        //   name: 'tracelens-collector'
+        //   env: [
+        //     {
+        //       name: 'Redis__Server'
+        //       value: 'redis'
+        //     }
+        //   ]
+        // }
       ]
       scale: {
         minReplicas: 1
         maxReplicas: 1
-      }
-    }
-  }
-  resource authConfig 'authConfigs' = {
-    name: 'current'
-    properties: {
-      platform: {
-        enabled: true
-      }
-      globalValidation: {
-        unauthenticatedClientAction: 'RedirectToLoginPage'
-        redirectToProvider: 'azureactivedirectory'
-      }
-      identityProviders: {
-        azureActiveDirectory: {
-          registration: {
-            openIdIssuer: 'https://sts.windows.net/${subscription().tenantId}/v2.0'
-            clientId: aadClientId
-          }
-          validation: {
-            allowedAudiences: []
-          }
-        }
-      }
-      login: {
-        preserveUrlFragmentsForLogins: false
       }
     }
   }

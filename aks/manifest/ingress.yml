@@ -113,6 +113,6 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: tracelens-ui
+            name: jaeger-ui
             port:
-              number: 5001
+              number: 16686

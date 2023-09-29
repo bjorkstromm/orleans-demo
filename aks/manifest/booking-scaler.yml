@@ -76,7 +76,7 @@ spec:
                 name: booking-config
                 key: MANAGEDIDENTITY_CLIENTID
           - name: OTEL_EXPORTER_OTLP_ENDPOINT
-            value: http://tracelens-collector.orleans-demo.svc.cluster.local:4317
+            value: http://jaeger-collector.orleans-demo.svc.cluster.local:4317
       terminationGracePeriodSeconds: 180
   minReadySeconds: 60
   strategy:
