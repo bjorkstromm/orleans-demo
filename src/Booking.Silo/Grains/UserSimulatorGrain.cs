@@ -7,6 +7,7 @@ public class UserSimulatorGrain : Grain, IUserSimulatorGrain, IRemindable
     private readonly IPersistentState<State> _state;
     private readonly IGrainFactory _grainFactory;
     private IDisposable? _timer;
+    private IReadOnlyCollection<Room> _rooms;
 
     [GenerateSerializer]
     public class State
@@ -22,8 +23,19 @@ public class UserSimulatorGrain : Grain, IUserSimulatorGrain, IRemindable
         _grainFactory = grainFactory;
     }
 
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        var catalog = _grainFactory.GetGrain<IRoomCatalogGrain>(0);
+        _rooms = await catalog.GetRooms();
+
+        await base.OnActivateAsync(cancellationToken);
+    }
+
     public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
     {
+        // Write state to storage
+        await _state.WriteStateAsync();
+
         // if we are getting deactivated, due to silo going down,
         // let's re-register the timer so that we'll hopefully wake up in another silo after 5 seconds
         if (_state.State.Count < 100)
@@ -40,7 +52,7 @@ public class UserSimulatorGrain : Grain, IUserSimulatorGrain, IRemindable
             TimeSpan.Zero,
             TimeSpan.FromMinutes(1));
 
-        _timer = RegisterTimer(OnTick, null, TimeSpan.FromSeconds(Random.Shared.Next(10)), TimeSpan.FromSeconds(5));
+        _timer = RegisterTimer(OnTick, string.Empty, TimeSpan.FromSeconds(Random.Shared.Next(10)), TimeSpan.FromSeconds(5));
     }
 
     private async Task OnTick(object? state)
@@ -53,30 +65,18 @@ public class UserSimulatorGrain : Grain, IUserSimulatorGrain, IRemindable
             return;
         }
 
-        var catalog = _grainFactory.GetGrain<IRoomCatalogGrain>(0);
-        var rooms = await catalog.GetRooms();
+        var timeSlotGrain = _grainFactory.GetGrain<ITimeSlotGrain>(RandomTimeSlot().Id);
+        var reservation = await timeSlotGrain.Reserve();
 
-        var roomId = rooms.ToArray()[Random.Shared.Next(rooms.Count)].Id;
-        var date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(Random.Shared.Next(1, 365)));
-
-        var roomGrain = _grainFactory.GetGrain<IRoomGrain>(roomId);
-        var timeSlots = await roomGrain.GetTimeSlots(date, date.AddDays(1));
-
-        var availableTimeSlots = timeSlots.Where(x => x.Available).ToArray();
-
-        if (availableTimeSlots.Length == 0)
+        if (!reservation.Success)
         {
             return;
         }
 
-        var timeSlot = availableTimeSlots[Random.Shared.Next(availableTimeSlots.Length)];
-
-        var timeSlotGrain = _grainFactory.GetGrain<ITimeSlotGrain>(timeSlot.Id);
-
-        await timeSlotGrain.Reserve();
+        await Task.Delay(TimeSpan.FromSeconds(Random.Shared.Next(5)));
+        await timeSlotGrain.CancelReservation(reservation.ReservationId!);
 
         _state.State.Count++;
-        await _state.WriteStateAsync();
     }
 
     public async Task ReceiveReminder(string reminderName, TickStatus status)
@@ -84,12 +84,22 @@ public class UserSimulatorGrain : Grain, IUserSimulatorGrain, IRemindable
         // Wake up timer if it's not running
         if (_state.State.Count < 100 && _timer is null)
         {
-            _timer = RegisterTimer(OnTick, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5));
+            _timer = RegisterTimer(OnTick, string.Empty, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5));
         }
         else if (_state.State.Count >= 100) // End after 100 iterations
         {
             var reminder = await this.GetReminder(reminderName);
             await this.UnregisterReminder(reminder);
         }
+    }
+
+    private TimeSlot RandomTimeSlot()
+    {
+        var roomId = _rooms.ToArray()[Random.Shared.Next(_rooms.Count)].Id;
+        var date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(Random.Shared.Next(365)));
+        var start = new TimeOnly(8 + Random.Shared.Next(8), 0);
+        var end = start.AddHours(1);
+
+        return new TimeSlot(roomId, date, start, end, false);
     }
 }

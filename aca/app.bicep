@@ -1,5 +1,6 @@
 param version string
 param aadClientId string
+param aadDomain string
 param location string = resourceGroup().location
 
 var name = 'mb-orleans-demo'
@@ -15,6 +16,10 @@ resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2022-03-01' 
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2021-04-01' existing = {
   name: '${shortName}sa'
+}
+
+resource keyVault 'Microsoft.KeyVault/vaults@2023-02-01' existing = {
+  name: '${shortName}kv'
 }
 
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2021-09-01' existing = {
@@ -35,9 +40,6 @@ resource scalerContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
       '${managedIdentity.id}': {}
     }
   }
-  dependsOn: [
-    redisContainerApp
-  ]
   properties: {
     managedEnvironmentId: containerAppEnvironment.id
     configuration: {
@@ -75,17 +77,7 @@ resource scalerContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
             }
             {
               name: 'OTEL_EXPORTER_OTLP_ENDPOINT'
-              value: 'http://localhost:4317'
-            }
-          ]
-        }
-        {
-          image: 'docker.io/rogeralsing/tracelens:amd64'
-          name: 'tracelens-collector'
-          env: [
-            {
-              name: 'Redis__Server'
-              value: 'redis'
+              value: 'http://jaeger:4317'
             }
           ]
         }
@@ -108,9 +100,6 @@ resource siloContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
       '${managedIdentity.id}': {}
     }
   }
-  dependsOn: [
-    redisContainerApp
-  ]
   properties: {
     managedEnvironmentId: containerAppEnvironment.id
     configuration: {
@@ -147,17 +136,7 @@ resource siloContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
             }
             {
               name: 'OTEL_EXPORTER_OTLP_ENDPOINT'
-              value: 'http://localhost:4317'
-            }
-          ]
-        }
-        {
-          image: 'docker.io/rogeralsing/tracelens:amd64'
-          name: 'tracelens-collector'
-          env: [
-            {
-              name: 'Redis__Server'
-              value: 'redis'
+              value: 'http://jaeger:4317'
             }
           ]
         }
@@ -193,9 +172,6 @@ resource webContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
       '${managedIdentity.id}': {}
     }
   }
-  dependsOn: [
-    redisContainerApp
-  ]
   properties: {
     managedEnvironmentId: containerAppEnvironment.id
     configuration: {
@@ -232,17 +208,7 @@ resource webContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
             }
             {
               name: 'OTEL_EXPORTER_OTLP_ENDPOINT'
-              value: 'http://localhost:4317'
-            }
-          ]
-        }
-        {
-          image: 'docker.io/rogeralsing/tracelens:amd64'
-          name: 'tracelens-collector'
-          env: [
-            {
-              name: 'Redis__Server'
-              value: 'redis'
+              value: 'http://jaeger:4317'
             }
           ]
         }
@@ -265,9 +231,6 @@ resource adminContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
       '${managedIdentity.id}': {}
     }
   }
-  dependsOn: [
-    redisContainerApp
-  ]
   properties: {
     managedEnvironmentId: containerAppEnvironment.id
     configuration: {
@@ -299,22 +262,28 @@ resource adminContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
               value: storageAccount.name
             }
             {
+              name: 'AZURE_KEYVAULT_NAME'
+              value: keyVault.name
+            }
+            {
               name: 'MANAGEDIDENTITY_CLIENTID'
               value: managedIdentity.properties.clientId
             }
             {
               name: 'OTEL_EXPORTER_OTLP_ENDPOINT'
-              value: 'http://localhost:4317'
+              value: 'http://jaeger:4317'
             }
-          ]
-        }
-        {
-          image: 'docker.io/rogeralsing/tracelens:amd64'
-          name: 'tracelens-collector'
-          env: [
             {
-              name: 'Redis__Server'
-              value: 'redis'
+              name: 'AzureAd__TenantId'
+              value: subscription().tenantId
+            }
+            {
+              name: 'AzureAd__Domain'
+              value: aadDomain
+            }
+            {
+              name: 'AzureAd__ClientId'
+              value: aadClientId
             }
           ]
         }
@@ -325,29 +294,38 @@ resource adminContainerApp 'Microsoft.App/containerApps@2022-03-01' = {
       }
     }
   }
-  resource authConfig 'authConfigs' = {
-    name: 'current'
-    properties: {
-      platform: {
-        enabled: true
-      }
-      globalValidation: {
-        unauthenticatedClientAction: 'RedirectToLoginPage'
-        redirectToProvider: 'azureactivedirectory'
-      }
-      identityProviders: {
-        azureActiveDirectory: {
-          registration: {
-            openIdIssuer: 'https://sts.windows.net/${subscription().tenantId}/v2.0'
-            clientId: aadClientId
+}
+
+// Jaeger
+resource jaegerContainerApp 'Microsoft.App/containerApps@2023-05-02-preview' = {
+  name: 'jaeger'
+  location: location
+  properties: {
+    managedEnvironmentId: containerAppEnvironment.id
+    configuration: {
+      activeRevisionsMode: 'Single'
+      ingress: {
+        additionalPortMappings: [
+          {
+            external: false
+            targetPort: 4317
           }
-          validation: {
-            allowedAudiences: []
-          }
+        ]
+        external: true
+        targetPort: 16686
+        transport: 'auto'
+      }
+    }
+    template: {
+      containers: [
+        {
+          image: 'jaegertracing/all-in-one:1.49'
+          name: 'jaeger'
         }
-      }
-      login: {
-        preserveUrlFragmentsForLogins: false
+      ]
+      scale: {
+        minReplicas: 1
+        maxReplicas: 1
       }
     }
   }

@@ -1,7 +1,8 @@
+using System.Net;
 using Azure.Identity;
 using Azure.Monitor.OpenTelemetry.Exporter;
 using Blazored.Toast;
-using OpenTelemetry;
+using Microsoft.AspNetCore.HttpOverrides;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -74,10 +75,16 @@ builder.Services.AddOpenTelemetry()
         .AddSource("Microsoft.Orleans.Runtime")
         .AddSource("Microsoft.Orleans.Application")
         .AddSource("Booking")
-        .AddOtlpExporter())
-    .StartWithHost();
+        .AddOtlpExporter());
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedHost | ForwardedHeaders.XForwardedProto;
+});
 
 var app = builder.Build();
+
+app.UseForwardedHeaders();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

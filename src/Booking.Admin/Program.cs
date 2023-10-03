@@ -1,6 +1,11 @@
+using System.Net;
 using Azure.Identity;
 using Azure.Monitor.OpenTelemetry.Exporter;
-using OpenTelemetry;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Identity.Web;
+using Microsoft.Identity.Web.UI;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -8,10 +13,11 @@ using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var storageName = builder.Configuration.GetValue<string>("AZURE_STORAGE_NAME");
+var managedIdentityClientId = builder.Configuration.GetValue<string>("MANAGEDIDENTITY_CLIENTID");
+
 builder.Host.UseOrleansClient(clientBuilder =>
 {
-    var storageName = builder.Configuration.GetValue<string>("AZURE_STORAGE_NAME");
-    var managedIdentityClientId = builder.Configuration.GetValue<string>("MANAGEDIDENTITY_CLIENTID");
     var connectionString = builder.Configuration.GetValue<string>("AzureWebJobsStorage");
     var useManagedIdentity = !string.IsNullOrWhiteSpace(storageName) && !string.IsNullOrWhiteSpace(managedIdentityClientId);
 
@@ -36,9 +42,40 @@ builder.Host.UseOrleansClient(clientBuilder =>
 });
 
 // Add services to the container.
+builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
+    .AddMicrosoftIdentityWebApp(builder.Configuration.GetSection("AzureAd"));
+builder.Services.AddControllersWithViews()
+    .AddMicrosoftIdentityUI();
+builder.Services.AddAuthorization(options =>
+{
+    // By default, all incoming requests will be authorized according to the default policy
+    options.FallbackPolicy = options.DefaultPolicy;
+});
+
 builder.Services.AddApplicationInsightsTelemetry();
 builder.Services.AddRazorPages();
-builder.Services.AddServerSideBlazor();
+builder.Services.AddServerSideBlazor()
+    .AddMicrosoftIdentityConsentHandler();
+
+var keyVaultName = builder.Configuration.GetValue<string>("AZURE_KEYVAULT_NAME");
+if (!string.IsNullOrEmpty(keyVaultName)
+    && !string.IsNullOrEmpty(storageName)
+    && !string.IsNullOrEmpty(managedIdentityClientId))
+{
+    var credential = new DefaultAzureCredential(new DefaultAzureCredentialOptions
+    {
+        ManagedIdentityClientId = managedIdentityClientId
+    });
+
+    builder.Services
+        .AddDataProtection()
+        .PersistKeysToAzureBlobStorage(
+            new Uri($"https://{storageName}.blob.core.windows.net/dataprotection/dataprotection"),
+            credential)
+        .ProtectKeysWithAzureKeyVault(
+            new Uri($"https://{keyVaultName}.vault.azure.net/keys/dataprotection"),
+            credential);
+}
 
 var applicationInsightsConnectionString = builder.Configuration.GetValue<string>("APPLICATIONINSIGHTS_CONNECTION_STRING");
 
@@ -72,10 +109,16 @@ builder.Services.AddOpenTelemetry()
         .AddSource("Microsoft.Orleans.Runtime")
         .AddSource("Microsoft.Orleans.Application")
         .AddSource("Booking")
-        .AddOtlpExporter())
-    .StartWithHost();
+        .AddOtlpExporter());
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedHost | ForwardedHeaders.XForwardedProto;
+});
 
 var app = builder.Build();
+
+app.UseForwardedHeaders();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
@@ -88,6 +131,9 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapControllers();
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
 

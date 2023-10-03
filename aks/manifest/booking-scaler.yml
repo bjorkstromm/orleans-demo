@@ -1,0 +1,99 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: booking-scaler
+  namespace: orleans-demo
+  labels:
+    app: booking-scaler
+spec:
+  selector:
+    matchLabels:
+      app: booking-scaler
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: booking-scaler
+
+        # The serviceId label is used to identify the service to Orleans
+        orleans/serviceId: booking-scaler
+
+        # The clusterId label is used to identify an instance of a cluster to Orleans.
+        # Typically, this will be the same value as serviceId or any fixed value.
+        # In cases where you are not using rolling deployments (for example, blue/green deployments),
+        # this value can allow for distinct clusters which do not communicate directly with each others,
+        # but which still share the same storage and other resources.
+        orleans/clusterId: booking
+
+        # Workload identity
+        azure.workload.identity/use: "true"
+    spec:
+      serviceAccountName: orleans-demo-sa
+      containers:
+        - name: main
+          image: mbaksacr.azurecr.io/booking.scaler:$BOOKERIZER_VERSION
+          ports:
+          - containerPort: 11111
+          - containerPort: 30000
+          - containerPort: 80
+          env:
+          # Configure settings to let Orleans know which cluster it belongs to and which pod it is running in
+          - name: ORLEANS_SERVICE_ID
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.labels['orleans/serviceId']
+          - name: ORLEANS_CLUSTER_ID
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.labels['orleans/clusterId']
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+          - name: DOTNET_SHUTDOWNTIMEOUTSECONDS
+            value: "120"
+          - name: APPLICATIONINSIGHTS_CONNECTION_STRING
+            valueFrom:
+              configMapKeyRef:
+                name: booking-config
+                key: APPLICATIONINSIGHTS_CONNECTION_STRING
+          - name: AZURE_STORAGE_NAME
+            valueFrom:
+              configMapKeyRef:
+                name: booking-config
+                key: AZURE_STORAGE_NAME
+          - name: MANAGEDIDENTITY_CLIENTID
+            valueFrom:
+              configMapKeyRef:
+                name: booking-config
+                key: MANAGEDIDENTITY_CLIENTID
+          - name: OTEL_EXPORTER_OTLP_ENDPOINT
+            value: http://jaeger-collector.orleans-demo.svc.cluster.local:4317
+      terminationGracePeriodSeconds: 180
+  minReadySeconds: 60
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+
+---
+# In order to be able to access the service from outside the cluster, we will need to add a Service object
+apiVersion: v1
+kind: Service
+metadata:
+  name: booking-scaler
+  namespace: orleans-demo
+spec:
+  ports:
+  - name: grpc
+    port: 80
+  selector:
+    app: booking-scaler

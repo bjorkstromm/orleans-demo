@@ -10,18 +10,17 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Azure.Identity" Version="1.8.1" />
-        <PackageReference Include="Microsoft.Extensions.Hosting" Version="7.0.0" />
-        <PackageReference Include="Microsoft.Orleans.Server" Version="7.0.0" />
-        <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" Version="7.0.0" />
-        <PackageReference Include="Microsoft.Orleans.Persistence.AzureStorage" Version="7.0.0" />
-        <PackageReference Include="Microsoft.Orleans.Reminders.AzureStorage" Version="7.0.0" />
-        <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.0.0-rc9.10" />
-        <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.4.0-rc.1" />
-        <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.4.0-rc.1" />
-        <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol.Logs" Version="1.4.0-rc.1" />
-        <PackageReference Include="Azure.Monitor.OpenTelemetry.Exporter" Version="1.0.0-beta.6" />
-        <PackageReference Include="OrleansDashboard" Version="7.0.2" />
+        <PackageReference Include="Azure.Identity" Version="1.10.1" />
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="7.0.1" />
+        <PackageReference Include="Microsoft.Orleans.Server" Version="7.2.1" />
+        <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" Version="7.2.1" />
+        <PackageReference Include="Microsoft.Orleans.Persistence.AzureStorage" Version="7.2.1" />
+        <PackageReference Include="Microsoft.Orleans.Reminders.AzureStorage" Version="7.2.1" />
+        <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.5.1-beta.1" />
+        <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.6.0" />
+        <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.6.0" />
+        <PackageReference Include="Azure.Monitor.OpenTelemetry.Exporter" Version="1.0.0" />
+        <PackageReference Include="OrleansDashboard" Version="7.2.2" />
         <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.21.0" />
     </ItemGroup>
 
