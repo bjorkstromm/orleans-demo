@@ -82,7 +82,8 @@ spec:
     spec:
       containers:
         - name: tracelens
-          image: docker.io/rogeralsing/tracelens:amd64
+          image: docker.io/rogeralsing/tracelens:latest
+          imagePullPolicy: Always
           ports:
           - containerPort: 5001
           - containerPort: 4317
