@@ -79,8 +79,7 @@ builder.Services.AddOpenTelemetry()
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
-    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-    options.KnownNetworks.Add(new IPNetwork(IPAddress.Parse("10.224.0.0"), 16));
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedHost | ForwardedHeaders.XForwardedProto;
 });
 
 var app = builder.Build();
