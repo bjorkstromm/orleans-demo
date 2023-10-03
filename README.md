@@ -3,13 +3,25 @@
 A simple implementation of a booking system using [Orleans](https://github.com/dotnet/orleans).
 
 The system consists of three applications:
-1. [Booking.Web](src/Booking.Web/), a Blazor Server application, which can be accessed at https://booking-web.jollysmoke-78d41806.westeurope.azurecontainerapps.io/
-2. [Booking.Admin](src/Booking.Admin/), a Blazor Server application, which can be accessed at https://booking-admin.jollysmoke-78d41806.westeurope.azurecontainerapps.io/ (currently blocked behind AAD login)
-3. [Booking.Silo](src/Booking.Silo/), a Orleans silo, which includes [Orleans Dashboard](https://github.com/OrleansContrib/OrleansDashboard), which can be accessed at https://booking-silo.jollysmoke-78d41806.westeurope.azurecontainerapps.io/
+1. [Booking.Web](src/Booking.Web/), a Blazor Server application, which is the end-user application.
+2. [Booking.Admin](src/Booking.Admin/), a Blazor Server application, which is a admin web for managing the system.
+3. [Booking.Silo](src/Booking.Silo/), a Orleans silo, which includes [Orleans Dashboard](https://github.com/OrleansContrib/OrleansDashboard).
 
-In addition to this, traces can examined using [TraceLens](https://github.com/asynkron/TraceLens) at https://tracelens-ui.jollysmoke-78d41806.westeurope.azurecontainerapps.io/
+The system is deployed to both [Azure Container Apps](https://learn.microsoft.com/azure/container-apps/) and [Azure Kubernetes Service](https://learn.microsoft.com/azure/aks/).
 
-The system runs on [Azure Container Apps](https://learn.microsoft.com/azure/container-apps/) and [Bicep](https://learn.microsoft.com/azure/azure-resource-manager/bicep/) files for the infrastructure can be find in [infra](infra).
+### Azure Kubernetes Service Links
+  * Booking.Web at https://bookerizer.aks.bjorkstrom.dev/
+  * Booking.Admin at https://admin.bookerizer.aks.bjorkstrom.dev/
+  * Booking.Silo at https://silo.bookerizer.aks.bjorkstrom.dev/
+  * In addition to this, traces can examined using [Jaeger UI](https://www.jaegertracing.io/) at https://trace.bookerizer.aks.bjorkstrom.dev/
+  * [Bicep](https://learn.microsoft.com/azure/azure-resource-manager/bicep/) files and kubernetes manifests available in [aks](aks) folder.
+ 
+ ### Azure Container Apps Links
+  * Booking.Web at https://booking-web.jollysmoke-78d41806.westeurope.azurecontainerapps.io/
+  * Booking.Admin at https://booking-admin.jollysmoke-78d41806.westeurope.azurecontainerapps.io/
+  * Booking.Silo at https://booking-silo.jollysmoke-78d41806.westeurope.azurecontainerapps.io/
+  * In addition to this, traces can examined using [Jaeger UI](https://www.jaegertracing.io/) at https://jaeger.jollysmoke-78d41806.westeurope.azurecontainerapps.io/
+  * [Bicep](https://learn.microsoft.com/azure/azure-resource-manager/bicep/) files available in [aca](aca) folder.
 
 ## Overview
 ![overview](media/overview.png)
